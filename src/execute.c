@@ -25,7 +25,7 @@ int main(void) {
 		}
 	}
 	else {
-		empty_lsmtree(tree);
+		empty_lsmtree(tree, CAPACITY);
 	}
 
 	// begin to process queries
