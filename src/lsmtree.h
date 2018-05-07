@@ -11,18 +11,7 @@
 #include "fencepointer.h"
 #include "bloom.h"
 #include "util.h"
-
-#define MAX_DIR_LEN 2048
-
-// LSM tree parameters
-#define DATA_DIR "/Users/RyanWallace/Desktop/All/School/Harvard/S S2/CS 265/project/data/"
-#define MAX_LEVELS 16
-
-#define BUFF_CAPACITY 2
-#define RATIO 3
-
-typedef int32_t KEY_TYPE; 
-typedef int32_t VAL_TYPE; 
+#include "params.h"
 
 typedef struct buffer {
 	KEY_TYPE *keys;

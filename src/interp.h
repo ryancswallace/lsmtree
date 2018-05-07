@@ -7,6 +7,7 @@
 #include <stdbool.h>
 
 #include "lsmtree.h"
+#include "params.h"
 
 #define MAX_CHARS_IN 2048
 
