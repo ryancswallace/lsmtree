@@ -27,8 +27,7 @@ int empty_lsmtree(lsmtree *tree, char *name) {
 	for (int level = 0; level < MAX_LEVELS; level++) {
 		tree->levels[level] = malloc(sizeof(level));
 		tree->levels[level]->num_runs = malloc(sizeof(int));
-		tree->levels[level]->num_runs = 0;
-		printf("%d\n", *(tree->levels[level]->num_runs));
+		*(tree->levels[level]->num_runs) = 0;
 	}
 
 	tree->levels[0]->runs = calloc(RATIO, sizeof(run *));
@@ -168,10 +167,7 @@ void flush_lsmtree(lsmtree *tree) {
 	new_run->size = malloc(sizeof(int));
 	*(new_run->size) = BUFF_CAPACITY * RATIO;
 
-	printf("before\n");
-	printf("%d\n", *(tree->levels[0]->num_runs));
 	tree->levels[0]->runs[*(tree->levels[0]->num_runs)] = new_run;
-	printf("after\n");
 	
 	tree->levels[0]->num_runs++;
 
