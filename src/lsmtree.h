@@ -58,7 +58,7 @@ typedef struct lsmtree {
 	int *run_ctr; // total number of runs ever created
 } lsmtree;
 
-lsmtree *init_lsmtree(void);
+lsmtree *new_lsmtree(void);
 int load_lsmtree(lsmtree *tree);
 int empty_lsmtree(lsmtree *tree, char *name);
 void free_lsmtree(lsmtree *tree);

@@ -4,9 +4,9 @@
 SECTION 1: functions for initializing, creating, loading, maintaining, and saving the LSM tree.
 */
 
-lsmtree *init_lsmtree(void) {
+lsmtree *new_lsmtree(void) {
 	/* 
-	Initializes empty LSM tree.
+	Initializes new LSM tree.
 	*/
 	lsmtree *tree = malloc(sizeof(lsmtree));
 	return tree;
@@ -23,15 +23,15 @@ int empty_lsmtree(lsmtree *tree, char *name) {
 	tree->buff->dels = calloc(BUFF_CAPACITY, sizeof(bool));
 
 	// initialize levels
-	tree->levels = calloc(MAX_LEVELS, sizeof(level));
+	tree->levels = calloc(MAX_LEVELS, sizeof(level *));
 	for (int level = 0; level < MAX_LEVELS; level++) {
-		printf("inside\n");
-		tree->levels[level].num_runs = malloc(sizeof(int));
-		tree->levels[level].num_runs = 0;
-		printf("%d\n", *(tree->levels[level].num_runs));
+		tree->levels[level] = malloc(sizeof(level));
+		tree->levels[level]->num_runs = malloc(sizeof(int));
+		tree->levels[level]->num_runs = 0;
+		printf("%d\n", *(tree->levels[level]->num_runs));
 	}
 
-	tree->levels[0].runs = calloc(RATIO, sizeof(run *));
+	tree->levels[0]->runs = calloc(RATIO, sizeof(run *));
 
 	// initialize tree variables
 	tree->num_levels = malloc(sizeof(int));
@@ -169,11 +169,11 @@ void flush_lsmtree(lsmtree *tree) {
 	*(new_run->size) = BUFF_CAPACITY * RATIO;
 
 	printf("before\n");
-	printf("%d\n", *(tree->levels[0].num_runs));
-	tree->levels[0].runs[*(tree->levels[0].num_runs)] = new_run;
+	printf("%d\n", *(tree->levels[0]->num_runs));
+	tree->levels[0]->runs[*(tree->levels[0]->num_runs)] = new_run;
 	printf("after\n");
 	
-	tree->levels[0].num_runs++;
+	tree->levels[0]->num_runs++;
 
 	// sort by key
 	sort(tree->buff->keys, tree->buff->vals);
@@ -257,15 +257,15 @@ void print_stats(lsmtree *tree) {
 			run *r = malloc(sizeof(run *));
 			// on disk
 			for (int level = 1; level < *(tree->num_levels); level++) {
-				for (int run = 0; run < *(tree->levels[level-1].num_runs); 
+				for (int run = 0; run < *(tree->levels[level-1]->num_runs); 
 					run++) {
-					r = tree->levels[level-1].runs[run];
+					r = tree->levels[level-1]->runs[run];
 
 					KEY_TYPE *keys_buff = calloc(*(r->size), sizeof(KEY_TYPE));
 					VAL_TYPE *vals_buff = calloc(*(r->size), sizeof(VAL_TYPE));
 					bool *dels_buff = calloc(*(r->size), sizeof(bool));
 
-					read_run(tree, tree->levels[level-1].runs[run], keys_buff,vals_buff, dels_buff);
+					read_run(tree, tree->levels[level-1]->runs[run], keys_buff,vals_buff, dels_buff);
 
 					for (int idx = 0; idx < *(r->size); idx++) {
 						if (!dels_buff[idx]) {
