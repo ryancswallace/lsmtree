@@ -12,18 +12,38 @@ lsmtree *init_lsmtree(void) {
 	return tree;
 }
 
-void empty_lsmtree(lsmtree *tree, size_t capacity) {
+int empty_lsmtree(lsmtree *tree, char *name) {
 	/* 
 	Creates new empty LSM tree.
 	*/
 	// initialize buffer
 	tree->buff = malloc(sizeof(buffer));
-	tree->buff->capacity = capacity;
+	tree->buff->capacity = BUFF_CAPACITY;
 	tree->buff->keys = calloc(tree->buff->capacity, sizeof(KEY_TYPE));
 	tree->buff->vals = calloc(tree->buff->capacity, sizeof(VAL_TYPE));
 
 	// initialize tree
 	tree->pairs_per_level = calloc(16, sizeof(size_t)); // 16 levels, dynamic
+	tree->num_pairs = malloc(sizeof(int));
+	tree->run_ctr = malloc(sizeof(int));
+
+	*(tree->num_pairs) = 0;
+	*(tree->run_ctr) = 0;
+
+	// create directory for data
+	char dir_name[MAX_DIR_LEN] = DATA_DIR;
+	strcat(dir_name, name);
+
+	struct stat status = {0};
+	if (stat(dir_name, &status) == 0) {
+		// directory already exist
+		printf("LSM tree with given name already exists.\n");
+		return 1;
+	} 
+    mkdir(dir_name, 0700);
+    strcpy(tree->data_dir, dir_name);
+
+	return 0;
 }
 
 int load_lsmtree(lsmtree *tree) {
@@ -45,10 +65,46 @@ void serialize_lsmtree(lsmtree *tree) {
 	*/
 }
 
+int write_run(lsmtree *tree, run *new_run, KEY_TYPE *keys, VAL_TYPE *vals) {
+	// writes a run to disk
+	// first create file paths
+	char keys_filepath[MAX_DIR_LEN];
+	char vals_filepath[MAX_DIR_LEN];
+
+	printf("num: %d\n", *(new_run->num));
+
+	strcpy(keys_filepath, tree->data_dir);
+	strcpy(vals_filepath, tree->data_dir);
+	strcat(keys_filepath, "/run");
+	strcat(vals_filepath, "/run");
+	strcat(keys_filepath, new_run->num);
+	strcat(vals_filepath, new_run->num);
+	strcat(keys_filepath, "_keys");
+	strcat(vals_filepath, "_vals");
+
+	printf("%s\n", keys_filepath);
+
+	return 0;
+}
+
 void flush_lsmtree(lsmtree *tree) {
 	/* 
 	Flushes buffer to L1.
 	*/
+	// create new run
+	run *new_run = malloc(sizeof(run));
+
+	new_run->num = malloc(1);
+	*(new_run->num) = *(tree->run_ctr) + 1;
+
+	// sort by key
+	sort(tree->buff->keys, tree->buff->vals);
+
+	// TODO: construct bloom filter and fence pointers
+
+	// write run to disk
+	write_run(tree, new_run, tree->buff->keys, tree->buff->vals);
+
 }
 
 
@@ -68,7 +124,7 @@ void put(lsmtree *tree, KEY_TYPE key, VAL_TYPE val) {
 		flush_lsmtree(tree);
 
 		// now space in buffer; call put again
-		put(tree, key, val);
+		// put(tree, key, val);
 	}
 }
 

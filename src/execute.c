@@ -25,7 +25,15 @@ int main(void) {
 		}
 	}
 	else {
-		empty_lsmtree(tree, CAPACITY);
+		char *name = malloc(MAX_CHARS_IN);
+		printf("Enter name for new LSM tree: ");
+		fgets(name, MAX_CHARS_IN, stdin);
+		name[strlen(name) - 1] = 0;
+
+		int failed = empty_lsmtree(tree, name);
+		if(failed) {
+			return 1;
+		}
 	}
 
 	// begin to process queries
