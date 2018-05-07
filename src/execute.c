@@ -76,7 +76,7 @@ int exec_query(lsmtree *tree, char* query) {
 		VAL_TYPE val = atoi(strtok(NULL, " "));
 
 		// query
-		put(tree, key, val);
+		put(tree, key, val, false);
 	}	
 	else if(query_type == 'g') {
 		// parse
