@@ -70,7 +70,7 @@ void put(lsmtree *tree, KEY_TYPE key, VAL_TYPE val, bool del);
 VAL_TYPE get(lsmtree *tree, KEY_TYPE key);
 KEY_TYPE *range(lsmtree *tree, KEY_TYPE key_start, KEY_TYPE key_stop);
 void delete(lsmtree *tree, KEY_TYPE key);
-void load(lsmtree *tree, char *filename);
+void load(lsmtree *tree, char *filepath);
 void print_stats(lsmtree *tree);
 
 #endif

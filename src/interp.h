@@ -9,7 +9,8 @@
 #include "lsmtree.h"
 #include "params.h"
 
-#define MAX_CHARS_IN 2048
+#define WORKLOAD_BUFF_SIZE 8589934592 // 8 GB
+#define LINE_BUFF_SIZE 2048
 
 int exec_workload(lsmtree *tree, char *workload);
 int exec_query(lsmtree *tree, char* query);

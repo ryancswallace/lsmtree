@@ -323,7 +323,7 @@ void put(lsmtree *tree, KEY_TYPE key, VAL_TYPE val, bool del) {
 }
 
 VAL_TYPE get(lsmtree *tree, KEY_TYPE key) {
-	return tree->buff->vals[key];
+	return 0;
 }
 
 KEY_TYPE *range(lsmtree *tree, KEY_TYPE key_start, KEY_TYPE key_stop) {
@@ -334,8 +334,36 @@ void delete(lsmtree *tree, KEY_TYPE key) {
 	put(tree, key, 0, true);
 }
 
-void load(lsmtree *tree, char *filename) {
+void load(lsmtree *tree, char *filepath) {
+	// loads all key-value pairs in specified binary file. Reads from disk in 
+	// chunks to trade off between memory overhead and I/O
+	long num_pairs_read;
+	long idx;
 
+	KEY_TYPE key;
+	VAL_TYPE val;
+
+	KEY_TYPE chunk[2 * LOAD_NUM_PAIRS];
+
+	FILE *f = fopen(filepath, "rb");
+	if (f) {
+		while(!feof(f)) {
+			num_pairs_read = fread(chunk, sizeof(KEY_TYPE), 2 * LOAD_NUM_PAIRS, f) / 2;
+
+			if (num_pairs_read > 0) {
+				for (int i = 0; i < num_pairs_read; i++) {
+					idx = 2 * i;
+					key = chunk[idx];
+					val = chunk[idx + 1];
+					
+					put(tree, key, val, false);
+				}
+			}
+		}
+	}
+	else {
+		printf("Load file file not found.\n");
+	}
 }
 
 void print_stats(lsmtree *tree) {

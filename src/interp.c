@@ -13,9 +13,9 @@ int main(void) {
 	}
 
 	if(mode == 'e') {
-		char *tree_path = malloc(MAX_CHARS_IN);
+		char *tree_path = malloc(LINE_BUFF_SIZE);
 		printf("Enter full path to existing LSM tree: ");
-		fgets(tree_path, MAX_CHARS_IN, stdin);
+		fgets(tree_path, LINE_BUFF_SIZE, stdin);
 		tree_path[strlen(tree_path) - 1] = 0;
 
 		int load_failed = load_lsmtree(tree);
@@ -25,9 +25,9 @@ int main(void) {
 		}
 	}
 	else {
-		char *name = malloc(MAX_CHARS_IN);
+		char *name = malloc(LINE_BUFF_SIZE);
 		printf("Enter name for new LSM tree: ");
-		fgets(name, MAX_CHARS_IN, stdin);
+		fgets(name, LINE_BUFF_SIZE, stdin);
 		name[strlen(name) - 1] = 0;
 
 		int failed = empty_lsmtree(tree, name);
@@ -39,10 +39,10 @@ int main(void) {
 	// begin to process queries
 	printf("\nType quit at any time to end session.\n\n");
 
-	char *command = malloc(MAX_CHARS_IN);
+	char *command = malloc(LINE_BUFF_SIZE);
 	while(1) {
 		printf(">>> ");
-		fgets(command, MAX_CHARS_IN, stdin);
+		fgets(command, LINE_BUFF_SIZE, stdin);
 		command[strlen(command) - 1] = 0;
 
 		if (strcmp(command, "quit") == 0) {
@@ -70,7 +70,7 @@ int exec_query(lsmtree *tree, char* query) {
 
 	if(query_type == 'p') {
 		// parse
-		char *pair = malloc(MAX_CHARS_IN);
+		char *pair = malloc(LINE_BUFF_SIZE);
 		strncpy(pair, query+2, strlen(query));
 		KEY_TYPE key = atoi(strtok(pair, " "));
 		VAL_TYPE val = atoi(strtok(NULL, " "));
@@ -88,7 +88,7 @@ int exec_query(lsmtree *tree, char* query) {
 	}
 	else if(query_type == 'r') {
 		// parse
-		char *pair = malloc(MAX_CHARS_IN);
+		char *pair = malloc(LINE_BUFF_SIZE);
 		strncpy(pair, query+2, strlen(query));
 		KEY_TYPE key_start = atoi(strtok(pair, " "));
 		KEY_TYPE key_stop = atoi(strtok(NULL, " "));
@@ -111,7 +111,7 @@ int exec_query(lsmtree *tree, char* query) {
 	}
 	else if(query_type == 'l') {
 		// parse
-		char *filepath = malloc(MAX_CHARS_IN);
+		char *filepath = malloc(LINE_BUFF_SIZE);
 		strncpy(filepath, query+3, strlen(query));
 		filepath[strlen(filepath) - 1] = 0;
 
@@ -122,12 +122,15 @@ int exec_query(lsmtree *tree, char* query) {
 	}	
 	else if(query_type == 'w') { // a full workload file
 		// parse
-		char *filepath = malloc(MAX_CHARS_IN);
+		char *filepath = malloc(LINE_BUFF_SIZE);
 		strncpy(filepath, query+3, strlen(query));
 		filepath[strlen(filepath) - 1] = 0;
 
 		// query
-		exec_workload(tree, filepath);
+		int failed = exec_workload(tree, filepath);
+		if(failed) {
+			return 1;
+		}
 
 		free(filepath);
 	}
@@ -139,38 +142,57 @@ int exec_query(lsmtree *tree, char* query) {
 }
 
 int exec_workload(lsmtree *tree, char *filepath) {
-	// reads and executes workload file 
-	// "/Users/RyanWallace/Desktop/All/School/Harvard/S S2/CS 265/project/generator/generator/workload.txt"
-	char *workload = NULL;
-	long len;
-	FILE *f = fopen(filepath, "r");
+	// reads and executes workload file. reads chunks of lines to minimize 
+	// both memory overhead and I/O. workload must end in trailing newline
+	char *chunk = malloc(WORKLOAD_BUFF_SIZE);
+	char *curr_query = NULL;
+	char *next_query = NULL;
+	long offset;
+	long num_bytes_read = WORKLOAD_BUFF_SIZE;
+	bool redo_line = false;
 
+	FILE *f = fopen(filepath, "r");
 	if (f) {
-		fseek(f, 0, SEEK_END);
-		len = ftell(f);
-		fseek(f, 0, SEEK_SET);
-		workload = malloc(len);
-		if (workload) {
-			fread(workload, 1, len, f);
+		while(num_bytes_read == WORKLOAD_BUFF_SIZE || redo_line) {
+			redo_line = false;
+
+			num_bytes_read = fread(chunk, 1, WORKLOAD_BUFF_SIZE, f);
+
+			// loop through each line
+			offset = ftell(f);
+			curr_query = strtok(chunk, "\n");
+			if (curr_query != NULL) {
+				next_query = strtok(NULL, "\n");
+			}
+			while (next_query != NULL) {
+				exec_query(tree, curr_query);
+
+				curr_query = next_query;
+				next_query = strtok(NULL, "\n");
+
+				offset += strlen(curr_query) + 1;
+			}
+			if(num_bytes_read != WORKLOAD_BUFF_SIZE) {
+				// reached end of file
+				exec_query(tree, curr_query);
+
+				break;
+			}
+			else {
+				// not at end of file
+				// back up file pointer to previous 
+				fseek(f, offset, SEEK_SET);
+				redo_line = true;
+			}
 		}
+		
 		fclose (f);
 	}
 	else {
 		printf("Workload file not found.\n");
 	}
 
-	char *query;
-	query = strtok(workload, "\n");
-
-	// loop through each line
-	while (query != NULL) {
-		exec_query(tree, query);
-
-		query = strtok(NULL, "\n");
-	}
-
-	// clean up
-	free(workload);
+	free(chunk);
 
 	return 0;
 }
