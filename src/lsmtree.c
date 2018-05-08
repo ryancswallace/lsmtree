@@ -33,13 +33,13 @@ int empty_lsmtree(lsmtree *tree, char *name) {
 	tree->buff->vals = calloc(BUFF_CAPACITY, sizeof(VAL_TYPE));
 	tree->buff->dels = calloc(BUFF_CAPACITY, sizeof(bool));
 
-	// initialize levels
+	// initialize levels and first level
 	tree->levels = calloc(MAX_NUM_LEVELS, sizeof(level *));
-	for (int level = 0; level < MAX_NUM_LEVELS; level++) {
-		tree->levels[level] = malloc(sizeof(level));
-		tree->levels[level]->num_runs = malloc(sizeof(int));
-		*(tree->levels[level]->num_runs) = 0;
-	}
+
+	tree->levels[0] = malloc(sizeof(level));
+
+	tree->levels[0]->num_runs = malloc(sizeof(int));
+	*(tree->levels[0]->num_runs) = 0;
 
 	tree->levels[0]->runs = calloc(RATIO, sizeof(run *));
 
@@ -102,7 +102,7 @@ char *run_filepath(lsmtree *tree, run *r, bool keys, bool dels) {
 	return filepath;
 }
 
-void write_run(lsmtree *tree, run *new_run, buffer *buff) {
+void write_run(lsmtree *tree, run *new_run) {
 	// writes a run to disk
 	char *keys_filepath = run_filepath(tree, new_run, true, false);
 	char *vals_filepath = run_filepath(tree, new_run, false, false);
@@ -110,7 +110,7 @@ void write_run(lsmtree *tree, run *new_run, buffer *buff) {
 
 	FILE *f_keys = fopen(keys_filepath, "wb");
 	if (f_keys) {
-		fwrite(buff->keys, sizeof(KEY_TYPE), *(new_run->size), f_keys);
+		fwrite(new_run->buff->keys, sizeof(KEY_TYPE), *(new_run->size), f_keys);
 		fclose (f_keys);
 	}
 	else {
@@ -120,7 +120,7 @@ void write_run(lsmtree *tree, run *new_run, buffer *buff) {
 
 	FILE *f_vals = fopen(vals_filepath, "wb");
 	if (f_vals) {
-		fwrite(buff->vals, sizeof(VAL_TYPE), *(new_run->size), f_vals);
+		fwrite(new_run->buff->vals, sizeof(VAL_TYPE), *(new_run->size), f_vals);
 		fclose (f_vals);
 	}
 	else {
@@ -131,7 +131,7 @@ void write_run(lsmtree *tree, run *new_run, buffer *buff) {
 	// TODO: pack bits
 	FILE *f_dels = fopen(dels_filepath, "wb");
 	if (f_dels) {
-		fwrite(buff->dels, sizeof(bool), *(new_run->size), f_dels);
+		fwrite(new_run->buff->dels, sizeof(bool), *(new_run->size), f_dels);
 		fclose (f_dels);
 	}
 	else {
@@ -145,7 +145,7 @@ void write_run(lsmtree *tree, run *new_run, buffer *buff) {
 }
 
 void read_run(lsmtree *tree, run *r, buffer *buff) {
-	// reads keys, vals, and del flags
+	// reads keys, vals, and del flags into provided buffer
 	char *keys_filepath = run_filepath(tree, r, true, false);
 	char *vals_filepath = run_filepath(tree, r, false, false);
 	char *dels_filepath = run_filepath(tree, r, false, true);
@@ -193,9 +193,21 @@ int sort_buff(buffer *buff) {
 	return 2;
 }
 
-run *sort_merge(level *l) {
+run *sort_merge(lsmtree *tree, level *l) {
 	// sort merges lvl and returns pointer to newly created run
 	run *new_run = malloc(sizeof(run));
+
+	new_run->num = malloc(sizeof(int));
+	(*tree->run_ctr)++;
+	*(new_run->num) = *(tree->run_ctr);
+
+	// new_run->buff = malloc(sizeof(buffer *));
+	// new_run->buff = tree->buff;
+
+	// new_run->size = malloc(sizeof(int));
+	// *(new_run->size) = ;
+	
+	// TODO: construct bloom filter and fence pointers
 
 	return new_run;
 }
@@ -207,15 +219,15 @@ void flush_lsmtree(lsmtree *tree) {
 	// sort by key
 	int num_pairs = sort_buff(tree->buff);
 
-	// TODO: construct bloom filter and fence pointers
-
-
 	// create and insert new run
 	run *new_run = malloc(sizeof(run));
 
 	new_run->num = malloc(sizeof(int));
 	(*tree->run_ctr)++;
 	*(new_run->num) = *(tree->run_ctr);
+
+	new_run->buff = malloc(sizeof(buffer *));
+	new_run->buff = tree->buff;
 
 	new_run->size = malloc(sizeof(int));
 	*(new_run->size) = num_pairs;
@@ -225,37 +237,56 @@ void flush_lsmtree(lsmtree *tree) {
 	(*tree->levels[0]->num_runs)++;
 	tree->pairs_per_level[1] += num_pairs;
 
+	// TODO: construct bloom filter and fence pointers
+
+
 	// write run to disk
-	write_run(tree, new_run, tree->buff);
+	write_run(tree, new_run);
 	
 	// reset buffer
 	tree->pairs_per_level[0] = 0;
 }
 
-void merge_lsmtree(lsmtree *tree, int level) {
-	// merges at specified level of lsm tree, if necessary
+void merge_lsmtree(lsmtree *tree, int level_num) {
+	// TODO: fix segfault, update counters, variables on merge, free functions for each struct (esp free runs written to disk).
+
+	// merges at specified level_num of lsm tree, if necessary
 	// uses tiering
 	// at termination, no merges remain
-	int level_capacity = int_pow(RATIO, level);
-	if (*(tree->levels[level - 1]->num_runs) == level_capacity) {
+	int level_capacity = int_pow(RATIO, level_num);
+	if (*(tree->levels[level_num - 1]->num_runs) == level_capacity) {
 		// maintain level count
-		if (level >= MAX_NUM_LEVELS) {
+		if (level_num >= MAX_NUM_LEVELS) {
 			printf("Increase MAX_NUM_LEVELS.\n");
 			exit(EXIT_FAILURE);
 		}
 
-		if (level == *(tree->num_levels) - 1) {
+		// add level if necessary
+		if (level_num == *(tree->num_levels) - 1) {
 			(*tree->num_levels)++;
+
+			tree->levels[level_num] = malloc(sizeof(level));
+
+			tree->levels[level_num]->num_runs = malloc(sizeof(int));
+			*(tree->levels[level_num]->num_runs) = 0;
+
+			tree->levels[level_num]->runs = calloc(RATIO * level_capacity, sizeof(run *));
 		}
 
-		// sort merge runs and add to level + 1
-		run *new_run = sort_merge(tree->levels[level - 1]); // TODO: malloc?
-		tree->levels[level]->runs[*(tree->levels[level]->num_runs)] = new_run;
+		// sort merge runs, add run to level_num + 1, write run to disk
+		run *new_run = sort_merge(tree, tree->levels[level_num - 1]); 
+		tree->levels[level_num]->runs[*(tree->levels[level_num]->num_runs)] = new_run;
+		// write_run(tree, new_run);
 
-		// clear runs from level
+		// clear runs from level_num
+		tree->pairs_per_level[level_num - 1] = 0;
+		tree->pairs_per_level[level_num] += *(new_run->size);
+
+		*(tree->levels[level_num - 1]->num_runs) = 0;
+		*(tree->levels[level_num]->num_runs) += 1;
 
 		// merge next level
-		merge_lsmtree(tree, level + 1);
+		merge_lsmtree(tree, level_num + 1);
 	}
 }
 
@@ -310,13 +341,13 @@ void load(lsmtree *tree, char *filename) {
 void print_stats(lsmtree *tree) {
 	printf("Total pairs: %d\n\n", *(tree->num_pairs));
 
-	for (int level = 0; level < *(tree->num_levels); level++) {
-		printf("LVL%d: %d\n", level, tree->pairs_per_level[level]);
+	for (int level_num = 0; level_num < *(tree->num_levels); level_num++) {
+		printf("LVL%d: %d\n", level_num, tree->pairs_per_level[level_num]);
 	}
 
 	printf("\nContents:\n\n");
-	for (int level = 0; level < *(tree->num_levels); level++) {
-		if (level == 0) {
+	for (int level_num = 0; level_num < *(tree->num_levels); level_num++) {
+		if (level_num == 0) {
 			// buffer
 			for (int idx = 0; idx < tree->pairs_per_level[0]; idx++) {
 				if (!tree->buff->dels[idx]) {
@@ -327,19 +358,19 @@ void print_stats(lsmtree *tree) {
 		}
 		else {
 			// on disk
-			for (int level = 1; level < *(tree->num_levels); level++) {
-				for (int run = 0; run < *(tree->levels[level-1]->num_runs); 
+			for (int level_num = 1; level_num < *(tree->num_levels); level_num++) {
+				for (int run = 0; run < *(tree->levels[level_num-1]->num_runs); 
 					run++) {
 					buffer *buff = malloc(sizeof(buffer));
-					buff->keys = calloc(*(tree->levels[level-1]->runs[run]->size), sizeof(KEY_TYPE));
-					buff->vals = calloc(*(tree->levels[level-1]->runs[run]->size), sizeof(VAL_TYPE));
-					buff->dels = calloc(*(tree->levels[level-1]->runs[run]->size), sizeof(bool));
+					buff->keys = calloc(*(tree->levels[level_num-1]->runs[run]->size), sizeof(KEY_TYPE));
+					buff->vals = calloc(*(tree->levels[level_num-1]->runs[run]->size), sizeof(VAL_TYPE));
+					buff->dels = calloc(*(tree->levels[level_num-1]->runs[run]->size), sizeof(bool));
 
-					read_run(tree, tree->levels[level-1]->runs[run], buff);
+					read_run(tree, tree->levels[level_num-1]->runs[run], buff);
 
-					for (int idx = 0; idx < *(tree->levels[level-1]->runs[run]->size); idx++) {
+					for (int idx = 0; idx < *(tree->levels[level_num-1]->runs[run]->size); idx++) {
 						if (!(buff->dels[idx])) {
-							printf("%d:%d:L%d ", buff->keys[idx], buff->vals[idx], level);
+							printf("%d:%d:L%d ", buff->keys[idx], buff->vals[idx], level_num);
 						}
 					}
 

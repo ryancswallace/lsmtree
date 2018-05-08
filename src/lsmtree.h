@@ -59,12 +59,12 @@ int empty_lsmtree(lsmtree *tree, char *name);
 void free_lsmtree(lsmtree *tree);
 void serialize_lsmtree(lsmtree *tree);
 char *run_filepath(lsmtree *tree, run *r, bool keys, bool dels);
-void write_run(lsmtree *tree, run *new_run, buffer *buff);
+void write_run(lsmtree *tree, run *new_run);
 void read_run(lsmtree *tree, run *r, buffer *buff);
 int sort_buff(buffer *buff);
-run *sort_merge(level *l); 
+run *sort_merge(lsmtree *tree, level *l); 
 void flush_lsmtree(lsmtree *tree);
-void merge_lsmtree(lsmtree *tree, int level);
+void merge_lsmtree(lsmtree *tree, int level_num);
 
 void put(lsmtree *tree, KEY_TYPE key, VAL_TYPE val, bool del);
 VAL_TYPE get(lsmtree *tree, KEY_TYPE key);
