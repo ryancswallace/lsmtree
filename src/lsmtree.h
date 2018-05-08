@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <math.h>
 
 #include "fencepointer.h"
 #include "bloom.h"
@@ -21,7 +22,10 @@ typedef struct buffer {
 
 typedef struct run {
 	int *num;
-	int *size;
+	buffer *buff; // NULL for runs on disk
+
+	int *size; // physical
+
 	fencepointer *fences;
 	bloomfilter *filter;
 } run;
@@ -38,12 +42,14 @@ typedef struct lsmtree {
 	// data
 	char data_dir[MAX_DIR_LEN];
 	buffer *buff;
-	level **levels;
+	level **levels; // L1, L2... (levels on disk)
 
 	// dynamic statistics
-	int *num_levels; // INCLUDING buffer
-	int *num_pairs;
-	int *pairs_per_level;
+	int *num_levels; // including buffer
+
+	int *num_pairs; // logical
+	int *pairs_per_level; // physical
+
 	int *run_ctr; // total number of runs ever created
 } lsmtree;
 
@@ -54,9 +60,11 @@ void free_lsmtree(lsmtree *tree);
 void serialize_lsmtree(lsmtree *tree);
 char *run_filepath(lsmtree *tree, run *r, bool keys, bool dels);
 void write_run(lsmtree *tree, run *new_run, buffer *buff);
-void read_run(lsmtree *tree, run *r, KEY_TYPE *keys_buff, VAL_TYPE *vals_buff, bool *dels_buff);
+void read_run(lsmtree *tree, run *r, buffer *buff);
+int sort_buff(buffer *buff);
+run *sort_merge(level *l); 
 void flush_lsmtree(lsmtree *tree);
-void merge_lsmtree(lsmtree *tree);
+void merge_lsmtree(lsmtree *tree, int level);
 
 void put(lsmtree *tree, KEY_TYPE key, VAL_TYPE val, bool del);
 VAL_TYPE get(lsmtree *tree, KEY_TYPE key);

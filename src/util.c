@@ -1,6 +1,15 @@
 #include "util.h"
 
-void sort(KEY_TYPE *keys, VAL_TYPE *vals) {
-	// sorts keys and vals array by keys in place
-
+int int_pow(int x, int y) {
+	// uses exponentiation by squaring method
+    if(y == 0) {
+        return 1;
+    }
+    int root = int_pow(x, y/2);
+    if (y % 2 == 0) {
+        return root * root;
+    }
+    else {
+        return x * root * root;
+    }
 }

@@ -10,7 +10,7 @@ typedef int32_t VAL_TYPE;
 #define BUFF_CAPACITY 2
 #define RATIO 3
 
-#define MAX_LEVELS 16
+#define MAX_NUM_LEVELS 64
 
 // interpreter parameters
 #define MAX_DIR_LEN 2048

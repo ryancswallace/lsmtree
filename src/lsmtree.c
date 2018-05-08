@@ -16,31 +16,32 @@ int empty_lsmtree(lsmtree *tree, char *name) {
 	/* 
 	Creates new empty LSM tree.
 	*/
+	// initialize tree variables
+	tree->num_levels = malloc(sizeof(int));
+	tree->num_pairs = malloc(sizeof(int));
+	tree->pairs_per_level = calloc(MAX_NUM_LEVELS, sizeof(size_t));
+	tree->run_ctr = malloc(sizeof(int));
+
+	*(tree->num_levels) = 2; // buffer and L1
+	*(tree->num_pairs) = 0;
+	*(tree->run_ctr) = 0;
+
 	// initialize buffer
 	tree->buff = malloc(sizeof(buffer));
+
 	tree->buff->keys = calloc(BUFF_CAPACITY, sizeof(KEY_TYPE));
 	tree->buff->vals = calloc(BUFF_CAPACITY, sizeof(VAL_TYPE));
 	tree->buff->dels = calloc(BUFF_CAPACITY, sizeof(bool));
 
 	// initialize levels
-	tree->levels = calloc(MAX_LEVELS, sizeof(level *));
-	for (int level = 0; level < MAX_LEVELS; level++) {
+	tree->levels = calloc(MAX_NUM_LEVELS, sizeof(level *));
+	for (int level = 0; level < MAX_NUM_LEVELS; level++) {
 		tree->levels[level] = malloc(sizeof(level));
 		tree->levels[level]->num_runs = malloc(sizeof(int));
 		*(tree->levels[level]->num_runs) = 0;
 	}
 
 	tree->levels[0]->runs = calloc(RATIO, sizeof(run *));
-
-	// initialize tree variables
-	tree->num_levels = malloc(sizeof(int));
-	tree->num_pairs = malloc(sizeof(int));
-	tree->pairs_per_level = calloc(MAX_LEVELS, sizeof(size_t));
-	tree->run_ctr = malloc(sizeof(int));
-
-	*(tree->num_levels) = 2; // buffer and L1
-	*(tree->num_pairs) = 0;
-	*(tree->run_ctr) = 0;
 
 	// create directory for data
 	char dir_name[MAX_DIR_LEN] = DATA_DIR;
@@ -109,30 +110,33 @@ void write_run(lsmtree *tree, run *new_run, buffer *buff) {
 
 	FILE *f_keys = fopen(keys_filepath, "wb");
 	if (f_keys) {
-		fwrite(buff->keys, sizeof(KEY_TYPE), tree->pairs_per_level[0], f_keys);
+		fwrite(buff->keys, sizeof(KEY_TYPE), *(new_run->size), f_keys);
 		fclose (f_keys);
 	}
 	else {
 		printf("Unable to write to disk.\n");
+		exit(EXIT_FAILURE);
 	}
 
 	FILE *f_vals = fopen(vals_filepath, "wb");
 	if (f_vals) {
-		fwrite(buff->vals, sizeof(VAL_TYPE), tree->pairs_per_level[0], f_vals);
+		fwrite(buff->vals, sizeof(VAL_TYPE), *(new_run->size), f_vals);
 		fclose (f_vals);
 	}
 	else {
 		printf("Unable to write to disk.\n");
+		exit(EXIT_FAILURE);
 	}
 
 	// TODO: pack bits
 	FILE *f_dels = fopen(dels_filepath, "wb");
 	if (f_dels) {
-		fwrite(buff->dels, sizeof(bool), tree->pairs_per_level[0], f_dels);
+		fwrite(buff->dels, sizeof(bool), *(new_run->size), f_dels);
 		fclose (f_dels);
 	}
 	else {
 		printf("Unable to write to disk.\n");
+		exit(EXIT_FAILURE);
 	}
 
 	free(keys_filepath);
@@ -140,41 +144,86 @@ void write_run(lsmtree *tree, run *new_run, buffer *buff) {
 	free(dels_filepath);
 }
 
-void read_run(lsmtree *tree, run *r, KEY_TYPE *keys_buff, VAL_TYPE *vals_buff, bool *dels_buff) {
+void read_run(lsmtree *tree, run *r, buffer *buff) {
 	// reads keys, vals, and del flags
 	char *keys_filepath = run_filepath(tree, r, true, false);
 	char *vals_filepath = run_filepath(tree, r, false, false);
 	char *dels_filepath = run_filepath(tree, r, false, true);
 
-	// TODO: read
+	// read from disk
+	FILE *f_keys = fopen(keys_filepath, "rb");
+	if (f_keys) {
+		fread(buff->keys, sizeof(KEY_TYPE), *(r->size), f_keys);
+		fclose (f_keys);
+	}
+	else {
+		printf("Unable to read from disk.\n");
+		exit(EXIT_FAILURE);
+	}
+
+	FILE *f_vals = fopen(vals_filepath, "rb");
+	if (f_vals) {
+		fread(buff->vals, sizeof(VAL_TYPE), *(r->size), f_vals);
+		fclose (f_vals);
+	}
+	else {
+		printf("Unable to read from disk.\n");
+		exit(EXIT_FAILURE);
+	}
+
+	FILE *f_dels = fopen(dels_filepath, "rb");
+	if (f_dels) {
+		fread(buff->dels, sizeof(bool), *(r->size), f_dels);
+		fclose (f_dels);
+	}
+	else {
+		printf("Unable to read from disk.\n");
+		exit(EXIT_FAILURE);
+	}
 
 	free(keys_filepath);
 	free(vals_filepath);
 	free(dels_filepath);
+}
+
+int sort_buff(buffer *buff) {
+	// sorts buffer in place, removing duplicate keys and perfoming deletes
+	// returns number of logical elements sorted buffer
+	
+	return 2;
+}
+
+run *sort_merge(level *l) {
+	// sort merges lvl and returns pointer to newly created run
+	run *new_run = malloc(sizeof(run));
+
+	return new_run;
 }
 
 void flush_lsmtree(lsmtree *tree) {
 	/* 
 	Flushes buffer to L1 and resets metadata. Does NOT zero buffer.
 	*/
+	// sort by key
+	int num_pairs = sort_buff(tree->buff);
+
+	// TODO: construct bloom filter and fence pointers
+
+
 	// create and insert new run
 	run *new_run = malloc(sizeof(run));
 
 	new_run->num = malloc(sizeof(int));
-	tree->run_ctr++;
+	(*tree->run_ctr)++;
 	*(new_run->num) = *(tree->run_ctr);
 
 	new_run->size = malloc(sizeof(int));
-	*(new_run->size) = BUFF_CAPACITY * RATIO;
+	*(new_run->size) = num_pairs;
 
 	tree->levels[0]->runs[*(tree->levels[0]->num_runs)] = new_run;
 	
-	tree->levels[0]->num_runs++;
-
-	// sort by key
-	sort(tree->buff->keys, tree->buff->vals);
-
-	// TODO: construct bloom filter and fence pointers
+	(*tree->levels[0]->num_runs)++;
+	tree->pairs_per_level[1] += num_pairs;
 
 	// write run to disk
 	write_run(tree, new_run, tree->buff);
@@ -183,10 +232,31 @@ void flush_lsmtree(lsmtree *tree) {
 	tree->pairs_per_level[0] = 0;
 }
 
-void merge_lsmtree(lsmtree *tree) {
-	// uses tiering. checks for any required merges. at termination, no merges 
-	// remain.
+void merge_lsmtree(lsmtree *tree, int level) {
+	// merges at specified level of lsm tree, if necessary
+	// uses tiering
+	// at termination, no merges remain
+	int level_capacity = int_pow(RATIO, level);
+	if (*(tree->levels[level - 1]->num_runs) == level_capacity) {
+		// maintain level count
+		if (level >= MAX_NUM_LEVELS) {
+			printf("Increase MAX_NUM_LEVELS.\n");
+			exit(EXIT_FAILURE);
+		}
 
+		if (level == *(tree->num_levels) - 1) {
+			(*tree->num_levels)++;
+		}
+
+		// sort merge runs and add to level + 1
+		run *new_run = sort_merge(tree->levels[level - 1]); // TODO: malloc?
+		tree->levels[level]->runs[*(tree->levels[level]->num_runs)] = new_run;
+
+		// clear runs from level
+
+		// merge next level
+		merge_lsmtree(tree, level + 1);
+	}
 }
 
 /*
@@ -200,14 +270,21 @@ void put(lsmtree *tree, KEY_TYPE key, VAL_TYPE val, bool del) {
 		tree->buff->dels[tree->pairs_per_level[0]] = del;
 
 		tree->pairs_per_level[0]++;
-		tree->num_pairs++;
+		if (del) {
+			// assume key already in tree to avoid cost of maintaining true 
+			// count
+			(*tree->num_pairs)--;
+		}
+		else {
+			(*tree->num_pairs)++;
+		}
 	}
 	else {
 		// flush buffer to L1
 		flush_lsmtree(tree);
 
 		// merge if necessary
-		merge_lsmtree(tree);
+		merge_lsmtree(tree, 1);
 
 		// now space in buffer; call put again
 		put(tree, key, val, del);
@@ -231,49 +308,43 @@ void load(lsmtree *tree, char *filename) {
 }
 
 void print_stats(lsmtree *tree) {
-	printf("Total pairs: %d\n", *(tree->num_pairs));
+	printf("Total pairs: %d\n\n", *(tree->num_pairs));
 
 	for (int level = 0; level < *(tree->num_levels); level++) {
 		printf("LVL%d: %d\n", level, tree->pairs_per_level[level]);
 	}
 
-	printf("\n\nContents:\n\n");
+	printf("\nContents:\n\n");
 	for (int level = 0; level < *(tree->num_levels); level++) {
 		if (level == 0) {
 			// buffer
 			for (int idx = 0; idx < tree->pairs_per_level[0]; idx++) {
 				if (!tree->buff->dels[idx]) {
-					printf("%d:%d:L%d", tree->buff->keys[idx], 
+					printf("%d:%d:L%d ", tree->buff->keys[idx], 
 						tree->buff->vals[idx], 0);
 				}
 			}
 		}
 		else {
-			// minimize clutter
-			run *r = malloc(sizeof(run *));
 			// on disk
 			for (int level = 1; level < *(tree->num_levels); level++) {
 				for (int run = 0; run < *(tree->levels[level-1]->num_runs); 
 					run++) {
-					r = tree->levels[level-1]->runs[run];
+					buffer *buff = malloc(sizeof(buffer));
+					buff->keys = calloc(*(tree->levels[level-1]->runs[run]->size), sizeof(KEY_TYPE));
+					buff->vals = calloc(*(tree->levels[level-1]->runs[run]->size), sizeof(VAL_TYPE));
+					buff->dels = calloc(*(tree->levels[level-1]->runs[run]->size), sizeof(bool));
 
-					KEY_TYPE *keys_buff = calloc(*(r->size), sizeof(KEY_TYPE));
-					VAL_TYPE *vals_buff = calloc(*(r->size), sizeof(VAL_TYPE));
-					bool *dels_buff = calloc(*(r->size), sizeof(bool));
+					read_run(tree, tree->levels[level-1]->runs[run], buff);
 
-					read_run(tree, tree->levels[level-1]->runs[run], keys_buff,vals_buff, dels_buff);
-
-					for (int idx = 0; idx < *(r->size); idx++) {
-						if (!dels_buff[idx]) {
-							printf("%d:%d:L%d", keys_buff[idx], vals_buff[idx], level);
+					for (int idx = 0; idx < *(tree->levels[level-1]->runs[run]->size); idx++) {
+						if (!(buff->dels[idx])) {
+							printf("%d:%d:L%d ", buff->keys[idx], buff->vals[idx], level);
 						}
 					}
 
-					free(keys_buff);
-					free(vals_buff);
-					free(dels_buff);
+					free(buff);
 				}
-			free(r);
 			}
 		}
 		printf("\n\n");

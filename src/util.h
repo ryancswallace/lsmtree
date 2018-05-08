@@ -1,11 +1,9 @@
 #ifndef UTIL_H
 #define UTIL_H
 
+#include <stdio.h>
 #include <stdlib.h>
 
-typedef int32_t KEY_TYPE; 
-typedef int32_t VAL_TYPE; 
-
-void sort(KEY_TYPE *keys, VAL_TYPE *vals);
+int int_pow(int x, int y);
 
 #endif
