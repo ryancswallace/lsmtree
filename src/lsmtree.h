@@ -15,6 +15,8 @@
 #include "params.h"
 
 typedef struct buffer {
+	int *size; // physical
+
 	KEY_TYPE *keys;
 	VAL_TYPE *vals;
 	bool *dels;
@@ -23,8 +25,6 @@ typedef struct buffer {
 typedef struct run {
 	int *num;
 	buffer *buff; // NULL for runs on disk
-
-	int *size; // physical
 
 	fencepointer *fences;
 	bloomfilter *filter;
@@ -48,7 +48,7 @@ typedef struct lsmtree {
 	int *num_levels; // including buffer
 
 	int *num_pairs; // logical
-	int *pairs_per_level; // physical
+	int *pairs_per_level; // physical, includes L0
 
 	int *run_ctr; // total number of runs ever created
 } lsmtree;
@@ -61,9 +61,11 @@ void serialize_lsmtree(lsmtree *tree);
 char *run_filepath(lsmtree *tree, run *r, bool keys, bool dels);
 void write_run(lsmtree *tree, run *new_run);
 void read_run(lsmtree *tree, run *r, buffer *buff);
-int sort_buff(buffer *buff);
-run *sort_merge(lsmtree *tree, level *l); 
-void flush_lsmtree(lsmtree *tree);
+void erase_run(lsmtree *tree, run *r);
+level *read_level(lsmtree *tree, int level_num);
+void sort(buffer *buff);
+void merge(lsmtree *tree, int level_num, run *new_run);
+run *merge_level(lsmtree *tree, int level_num); 
 void merge_lsmtree(lsmtree *tree, int level_num);
 
 void put(lsmtree *tree, KEY_TYPE key, VAL_TYPE val, bool del);
@@ -72,5 +74,15 @@ KEY_TYPE *range(lsmtree *tree, KEY_TYPE key_start, KEY_TYPE key_stop);
 void delete(lsmtree *tree, KEY_TYPE key);
 void load(lsmtree *tree, char *filepath);
 void print_stats(lsmtree *tree);
+
+void free_buffer_data(buffer *buff);
+void free_run_data(run *r);
+void free_level_data(level *l);
+void free_lsmtree_data(lsmtree *tree);
+void free_buffer(buffer *buff);
+void free_run(run *r);
+void free_level(level *l);
+void free_lsmtree(lsmtree *tree);
+void erase_level(lsmtree *tree, int level_num);
 
 #endif

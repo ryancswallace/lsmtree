@@ -63,8 +63,11 @@ int main(void) {
 	printf("\nSession ended.\n");
 }
 
-int exec_query(lsmtree *tree, char* query) {
+int exec_query(lsmtree *tree, char* q) {
 	// parses and executes query on the LSM tree
+	// don't modify query argument
+	char query[LINE_BUFF_SIZE];
+	strcpy(query, q);
 
 	char query_type = query[0];
 
@@ -144,55 +147,37 @@ int exec_query(lsmtree *tree, char* query) {
 int exec_workload(lsmtree *tree, char *filepath) {
 	// reads and executes workload file. reads chunks of lines to minimize 
 	// both memory overhead and I/O. workload must end in trailing newline
-	char *chunk = malloc(WORKLOAD_BUFF_SIZE);
-	char *curr_query = NULL;
-	char *next_query = NULL;
-	long offset;
-	long num_bytes_read = WORKLOAD_BUFF_SIZE;
-	bool redo_line = false;
+	char *workload = NULL;
+	long len;
 
 	FILE *f = fopen(filepath, "r");
+
 	if (f) {
-		while(num_bytes_read == WORKLOAD_BUFF_SIZE || redo_line) {
-			redo_line = false;
-
-			num_bytes_read = fread(chunk, 1, WORKLOAD_BUFF_SIZE, f);
-
-			// loop through each line
-			offset = ftell(f);
-			curr_query = strtok(chunk, "\n");
-			if (curr_query != NULL) {
-				next_query = strtok(NULL, "\n");
-			}
-			while (next_query != NULL) {
-				exec_query(tree, curr_query);
-
-				curr_query = next_query;
-				next_query = strtok(NULL, "\n");
-
-				offset += strlen(curr_query) + 1;
-			}
-			if(num_bytes_read != WORKLOAD_BUFF_SIZE) {
-				// reached end of file
-				exec_query(tree, curr_query);
-
-				break;
-			}
-			else {
-				// not at end of file
-				// back up file pointer to previous 
-				fseek(f, offset, SEEK_SET);
-				redo_line = true;
-			}
+		fseek(f, 0, SEEK_END);
+		len = ftell(f);
+		fseek(f, 0, SEEK_SET);
+		workload = malloc(len);
+		if (workload) {
+			fread(workload, 1, len, f);
 		}
-		
 		fclose (f);
 	}
 	else {
 		printf("Workload file not found.\n");
 	}
 
-	free(chunk);
+	char *query;
+	char *saveptr;
+	query = strtok_r(workload, "\n", &saveptr);
+
+	// loop through each line
+	while (query != NULL) {
+		exec_query(tree, query);
+		query = strtok_r(NULL, "\n", &saveptr);
+	}
+
+	// clean up
+	free(workload);
 
 	return 0;
 }

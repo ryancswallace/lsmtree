@@ -5,4 +5,6 @@ typedef struct fencepointer {
 
 } fencepointer;
 
+void free_fencepointer(fencepointer *fp);
+
 #endif

@@ -2,6 +2,7 @@
 #define INTERP_H
 
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
@@ -13,6 +14,6 @@
 #define LINE_BUFF_SIZE 2048
 
 int exec_workload(lsmtree *tree, char *workload);
-int exec_query(lsmtree *tree, char* query);
+int exec_query(lsmtree *tree, char* q);
 
 #endif

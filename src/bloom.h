@@ -5,4 +5,6 @@ typedef struct bloomfilter {
 
 } bloomfilter;
 
+void free_bloomfilter(bloomfilter *bf);
+
 #endif
