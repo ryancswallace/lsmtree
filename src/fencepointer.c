@@ -1,6 +1,7 @@
 #include "fencepointer.h"
 
 fencepointer *create_fencepointer(KEY_TYPE *keys, int size) {
+	printf("creating fencepointer\n");
 	fencepointer *fp = malloc(sizeof(fencepointer));
 
 	// calculate number of fencepointers and keys per fencepointer
@@ -25,7 +26,7 @@ fencepointer *create_fencepointer(KEY_TYPE *keys, int size) {
 
 		// populate fencepointers
 		int keys_idx;
-		for (int p = 0; p > fp->num_fences; p++) {
+		for (int p = 0; p < fp->num_fences; p++) {
 			keys_idx = p * fp->keys_per_fence;
 			fp->mins[p] = keys[keys_idx];
 		}
@@ -36,8 +37,34 @@ fencepointer *create_fencepointer(KEY_TYPE *keys, int size) {
 	return fp;
 }
 
-void query_fencepointer(fencepointer *fp, KEY_TYPE key, int *idx_range_start, int *idx_range_stop) {
+int *query_fencepointer(fencepointer *fp, KEY_TYPE key) {
+	// NULL => before start of run
+	// i => at fence i or after
+	int *fence_num = NULL;
 
+	// printf("query_fencepointer:\n");
+	// for (int i = 0; i < fp->num_fences; i++) {
+	// 	printf("i: %d, ", fp->mins[i]);
+	// }
+	// printf("\n");
+
+	if (key >= fp->mins[0]) {
+		// not before start of run
+		fence_num = malloc(sizeof(int));
+		*fence_num = 1;
+		// find max fence less than key
+		for (int i = 2; i <= fp->num_fences; i++) {
+			if (key >= fp->mins[i - 1]) {
+				// before start of run
+				*fence_num = i;
+			}
+			else {
+				break;
+			}
+		}
+	}
+
+	return fence_num;
 }
 
 void free_fencepointer(fencepointer *fp) {

@@ -36,12 +36,32 @@ int main(void) {
 		}
 	}
 
+	// interactive or text file mode
+	char interactive = '0';
+	while(!(interactive == 'i' || interactive == 'f')) {
+		printf("Interactive [i] or write to file [f] mode: ");
+		interactive = fgetc(stdin);
+		fgetc(stdin); // eat newline
+	}
+
+	char dir_name[MAX_DIR_LEN] = DATA_DIR;
+	if(interactive == 'f') {
+		// redirect stdout to file
+		strcat(dir_name, tree->name);
+		strcat(dir_name, "/log.txt");
+
+		freopen(dir_name, "a+", stdout);
+	}
+
 	// begin to process queries
 	printf("\nType quit at any time to end session.\n\n");
 
 	char *command = malloc(LINE_BUFF_SIZE);
 	while(1) {
-		printf(">>> ");
+		if(interactive == 'i') {
+			printf(">>> ");
+		} 
+		
 		fgets(command, LINE_BUFF_SIZE, stdin);
 		command[strlen(command) - 1] = 0;
 
@@ -58,7 +78,6 @@ int main(void) {
 		}
 	}
 	free(command);
-	free_lsmtree(tree);
 
 	printf("\nSession ended.\n");
 }
@@ -86,8 +105,13 @@ int exec_query(lsmtree *tree, char* q) {
 		KEY_TYPE key = atoi(query+2);
 
 		// query
-		VAL_TYPE val = get(tree, key);
-		printf("%d\n", val);
+		VAL_TYPE *val = get(tree, key);
+		if (val) {
+			// if val found, not NULL
+			printf("%d", *val);
+			free(val);
+		}
+		printf("\n");
 	}
 	else if(query_type == 'r') {
 		// parse

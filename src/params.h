@@ -8,7 +8,7 @@ typedef int32_t KEY_TYPE;
 typedef int32_t VAL_TYPE;
 #define MAX_KEY 2147483648
 
-#define BUFF_CAPACITY 16
+#define BUFF_CAPACITY 2
 #define RATIO 3
 
 #define M_FENCES 1 // pages per fence pointer

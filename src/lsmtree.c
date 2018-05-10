@@ -16,6 +16,10 @@ int empty_lsmtree(lsmtree *tree, char *name) {
 	/* 
 	Creates new empty LSM tree.
 	*/
+	// initialize names
+	tree->name = malloc(MAX_DIR_LEN);
+	tree->data_dir = malloc(MAX_DIR_LEN);
+	
 	// initialize tree variables
 	tree->num_levels = malloc(sizeof(int));
 	tree->num_pairs = malloc(sizeof(int));
@@ -56,7 +60,9 @@ int empty_lsmtree(lsmtree *tree, char *name) {
 		return 1;
 	} 
     mkdir(dir_name, 0700);
+
     strcpy(tree->data_dir, dir_name);
+    strcpy(tree->name, name);
 
 	return 0;
 }
@@ -140,8 +146,70 @@ void write_run(lsmtree *tree, run *new_run) {
 	free(dels_filepath);
 }
 
+void read_keys(lsmtree *tree, run *r, buffer *buff, int idx_start, int idx_stop) {
+	// reads keys of specified run between idx_start and idx_stop (inclusive) 
+	// into provided buffer 
+	char *keys_filepath = run_filepath(tree, r, true, false);
+
+	// calculate where to read
+	int offset = idx_start * sizeof(KEY_TYPE);
+	int num_keys = idx_stop - idx_start + 1;
+
+	// read from disk
+	FILE *f_keys = fopen(keys_filepath, "rb");
+	if (f_keys) {
+		fseek(f_keys, offset, SEEK_SET);
+		fread(buff->keys, sizeof(KEY_TYPE), num_keys, f_keys);
+		fclose(f_keys);
+	}
+	else {
+		printf("Unable to read from disk.\n");
+		exit(EXIT_FAILURE);
+	}
+
+	free(keys_filepath);
+}
+
+void read_vals_dels(lsmtree *tree, run *r, buffer *buff, int idx_start, int idx_stop) {
+	// reads vals and dels of specified run between idx_start and idx_stop (
+	// inclusive) into provided buffer 
+	char *vals_filepath = run_filepath(tree, r, false, false);
+	char *dels_filepath = run_filepath(tree, r, false, true);
+
+	// calculate where to read
+	int offset_vals = idx_start * sizeof(VAL_TYPE);
+	int offset_dels = idx_start * sizeof(bool);
+	int num_keys = idx_stop - idx_start + 1;
+
+	// read from disk
+	FILE *f_vals = fopen(vals_filepath, "rb");
+	if (f_vals) {
+		fseek(f_vals, offset_vals, SEEK_SET);
+		fread(buff->vals, sizeof(VAL_TYPE), num_keys, f_vals);
+		fclose(f_vals);
+	}
+	else {
+		printf("Unable to read from disk.\n");
+		exit(EXIT_FAILURE);
+	}
+
+	FILE *f_dels = fopen(dels_filepath, "rb");
+	if (f_dels) {
+		fseek(f_dels, offset_dels, SEEK_SET);
+		fread(buff->dels, sizeof(bool), num_keys, f_dels);
+		fclose(f_dels);
+	}
+	else {
+		printf("Unable to read from disk.\n");
+		exit(EXIT_FAILURE);
+	}
+
+	free(vals_filepath);
+	free(dels_filepath);
+}
+
 void read_run(lsmtree *tree, run *r, buffer *buff) {
-	// reads keys, vals, and del flags into provided buffer
+	// reads all keys, vals, and del flags of the run into provided buffer
 	char *keys_filepath = run_filepath(tree, r, true, false);
 	char *vals_filepath = run_filepath(tree, r, false, false);
 	char *dels_filepath = run_filepath(tree, r, false, true);
@@ -312,7 +380,7 @@ void merge(lsmtree *tree, int level_num, run *new_run) {
 
 	for (int i = 0; i < sum_sizes; i++) {
 		// printf("i: %d\n", i);
-		for (int run = 0; run < num_runs; run++) {
+		for (int run = num_runs - 1; run >= 0; run--) {
 			// printf("run: %d\n", run);
 			if (head_idxs[run] < *l->runs[run]->buff->size) {
 				// printf("not empty at head_idxs[run] %d\n", head_idxs[run]);
@@ -479,8 +547,100 @@ void put(lsmtree *tree, KEY_TYPE key, VAL_TYPE val, bool del) {
 	}
 }
 
-VAL_TYPE get(lsmtree *tree, KEY_TYPE key) {
-	return 0;
+void probe_run(lsmtree *tree, run *r, KEY_TYPE key, VAL_TYPE **res, bool **del) {
+	// probes run r for specified key. If found, allocates memory and 
+	// populates pointers to res and del
+
+	// NULL => before start of run
+	// i => after fence i
+
+	int *fence_num = query_fencepointer(r->fp, key);
+
+	if (fence_num) {
+		// find range of key indices
+		int idx_start = (*fence_num - 1) * r->fp->keys_per_fence;
+		int idx_stop = ((*fence_num) * r->fp->keys_per_fence) - 1;
+		if (idx_stop > *r->buff->size - 1) {
+			idx_stop = *r->buff->size - 1;
+		}
+		int num_keys = idx_stop - idx_start + 1;
+
+		buffer *buff = malloc(sizeof(buff));
+		buff->size = malloc(sizeof(int));
+		buff->keys = calloc(num_keys, sizeof(KEY_TYPE));
+
+		// // read portion of run from disk
+		read_keys(tree, r, buff, idx_start, idx_stop);
+
+		// check for key in portion
+		for (int i = num_keys - 1; i >= 0; i--) {
+			if (buff->keys[i] == key) {
+				buff->vals = calloc(num_keys, sizeof(VAL_TYPE));
+				buff->dels = calloc(num_keys, sizeof(bool));
+
+				read_vals_dels(tree, r, buff, idx_start, idx_stop);
+
+				*res = malloc(sizeof(VAL_TYPE));
+				*del = malloc(sizeof(bool));
+
+				**res = buff->vals[i];
+				**del = buff->dels[i];
+
+				free(buff->vals);
+				free(buff->dels);
+
+				break;
+			}
+		}
+
+		free(buff->size);
+		free(buff->keys);
+		free(buff);
+	}
+	else {
+		// key not in run
+		return;
+	}
+}
+
+VAL_TYPE *get(lsmtree *tree, KEY_TYPE key) {
+	// returns pointer to val if found, otherwise NULL
+	// caller must free return value if not NULL
+	VAL_TYPE *res = NULL;
+	bool *del = NULL;
+
+	// scan L0 backwards
+	for (int i = *tree->buff->size - 1; i >= 0; i--) {
+		if (tree->buff->keys[i] == key) {
+			if (!tree->buff->dels[i]) {
+				// not deleted
+				res = malloc(sizeof(VAL_TYPE));
+				*res = tree->buff->vals[i];
+			}
+			return res; // still NULL if deleted
+		}
+	}
+
+	// probe disk
+	for (int level_num = 1; level_num < *tree->num_levels; level_num++) {
+		level *l = tree->levels[level_num - 1];
+		for (int run_num = *l->num_runs - 1; run_num >= 0; run_num--) {
+			run *r = l->runs[run_num];
+			probe_run(tree, r, key, &res, &del);
+			if (res) {
+				// key found
+				if (*del) {
+					// deleted
+					res = NULL;
+				}
+				free(del);
+				return res;
+			}
+		}
+	}
+
+	// not found in tree
+	return res; 
 }
 
 KEY_TYPE *range(lsmtree *tree, KEY_TYPE key_start, KEY_TYPE key_stop) {
@@ -632,5 +792,8 @@ void free_lsmtree(lsmtree *tree) {
 	free(tree->num_pairs);
 	free(tree->pairs_per_level);
 	free(tree->run_ctr);	
+
+	free(tree->name);
+	free(tree->data_dir);
 }
 

@@ -14,7 +14,7 @@ typedef struct fencepointer {
 } fencepointer;
 
 fencepointer *create_fencepointer(KEY_TYPE *keys, int size);
-void query_fencepointer(fencepointer *fp, KEY_TYPE key, int *idx_range_start, int *idx_range_stop);
+int *query_fencepointer(fencepointer *fp, KEY_TYPE key);
 void free_fencepointer(fencepointer *fp);
 
 #endif

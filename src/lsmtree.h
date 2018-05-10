@@ -37,10 +37,10 @@ typedef struct level {
 
 typedef struct lsmtree {
 	// name as saved on disk
-	char name[MAX_DIR_LEN];
+	char *name;
 
 	// data
-	char data_dir[MAX_DIR_LEN];
+	char *data_dir;
 	buffer *buff;
 	level **levels; // L1, L2... (levels on disk)
 
@@ -60,6 +60,8 @@ void free_lsmtree(lsmtree *tree);
 void serialize_lsmtree(lsmtree *tree);
 char *run_filepath(lsmtree *tree, run *r, bool keys, bool dels);
 void write_run(lsmtree *tree, run *new_run);
+void read_vals_dels(lsmtree *tree, run *r, buffer *buff, int idx_start, int idx_stop);
+void read_keys(lsmtree *tree, run *r, buffer *buff, int idx_start, int idx_stop);
 void read_run(lsmtree *tree, run *r, buffer *buff);
 void erase_run(lsmtree *tree, run *r);
 level *read_level(lsmtree *tree, int level_num);
@@ -69,7 +71,8 @@ run *merge_level(lsmtree *tree, int level_num);
 void merge_lsmtree(lsmtree *tree, int level_num);
 
 void put(lsmtree *tree, KEY_TYPE key, VAL_TYPE val, bool del);
-VAL_TYPE get(lsmtree *tree, KEY_TYPE key);
+void probe_run(lsmtree *tree, run *r, KEY_TYPE key, VAL_TYPE **res, bool **del);
+VAL_TYPE *get(lsmtree *tree, KEY_TYPE key);
 KEY_TYPE *range(lsmtree *tree, KEY_TYPE key_start, KEY_TYPE key_stop);
 void delete(lsmtree *tree, KEY_TYPE key);
 void load(lsmtree *tree, char *filepath);
