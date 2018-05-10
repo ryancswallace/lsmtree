@@ -75,7 +75,7 @@ void serialize_lsmtree(lsmtree *tree) {
 }
 
 char *run_filepath(lsmtree *tree, run *r, bool keys, bool dels) {
-	// first create file paths
+	// create string containing file path of run r on disk
 	char *filepath = malloc(MAX_DIR_LEN);
 
 	char str[MAX_DIR_LEN];
@@ -211,6 +211,12 @@ level *read_level(lsmtree *tree, int level_num) {
 
 		l->runs[run_num]->num = malloc(sizeof(int));
 		*l->runs[run_num]->num = *tree->levels[level_num - 1]->runs[run_num]->num;
+
+		l->runs[run_num]->fp = malloc(sizeof(fencepointer));
+		l->runs[run_num]->fp = tree->levels[level_num - 1]->runs[run_num]->fp;
+
+		l->runs[run_num]->bf = malloc(sizeof(bloomfilter));
+		l->runs[run_num]->bf = tree->levels[level_num - 1]->runs[run_num]->bf;
 
 		l->runs[run_num]->buff = malloc(sizeof(buffer));
 
@@ -367,7 +373,9 @@ run *merge_level(lsmtree *tree, int level_num) {
 		merge(tree, level_num, new_run);
 	}
 	
-	// TODO: construct bloom filter and fence pointers
+	// construct bloom filter and fence pointers
+	new_run->fp = create_fencepointer(new_run->buff->keys, *new_run->buff->size);
+	new_run->bf = create_bloomfilter(new_run->buff->keys, *new_run->buff->size);
 
 	return new_run;
 }
@@ -416,12 +424,12 @@ void merge_lsmtree(lsmtree *tree, int level_num) {
 	// add run to level_num + 1
 	tree->levels[level_num]->runs[*tree->levels[level_num]->num_runs] = new_run;
 
-	// write run to disk and erase old run, free run's data from memory
+	// write run to disk from memory; erase old level from disk
 	write_run(tree, new_run);
 
 	if (level_num != 0) {
 		free_run_data(new_run);
-		erase_level(tree, level_num - 1);
+		erase_level(tree, level_num);
 	}
 
 	// add count of pairs to next level
@@ -565,8 +573,8 @@ not the structs themselves.
 
 void erase_level(lsmtree *tree, int level_num) {
 	// from disk
-	for (int run_num = 0; run_num < *tree->levels[level_num]->num_runs; run_num++) {
-		erase_run(tree, tree->levels[level_num]->runs[run_num]);
+	for (int run_num = 0; run_num < *tree->levels[level_num - 1]->num_runs; run_num++) {
+		erase_run(tree, tree->levels[level_num - 1]->runs[run_num]);
 	}
 }
 
@@ -602,14 +610,16 @@ void free_buffer(buffer *buff) {
 void free_run(run *r) {
 	free_run_data(r);
 
-	free_fencepointer(r->fences);
-	free_bloomfilter(r->filter);
+	free_fencepointer(r->fp);
+	free_bloomfilter(r->bf);
 
 	free(r->num);
 }
 
 void free_level(level *l) {
-	free_level_data(l);
+	for (int run_num = 0; run_num < *l->num_runs; run_num++) {
+		free_run(l->runs[run_num]);
+	}
 
 	free(l->runs);
 	free(l->num_runs);

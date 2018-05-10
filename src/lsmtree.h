@@ -26,8 +26,8 @@ typedef struct run {
 	int *num;
 	buffer *buff; // NULL for runs on disk
 
-	fencepointer *fences;
-	bloomfilter *filter;
+	fencepointer *fp;
+	bloomfilter *bf;
 } run;
 
 typedef struct level {
