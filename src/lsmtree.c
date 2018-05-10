@@ -442,8 +442,12 @@ run *merge_level(lsmtree *tree, int level_num) {
 	}
 	
 	// construct bloom filter and fence pointers
-	new_run->fp = create_fencepointer(new_run->buff->keys, *new_run->buff->size);
-	new_run->bf = create_bloomfilter(new_run->buff->keys, *new_run->buff->size);
+	if (*new_run->buff->size > RUN_MIN) {
+		new_run->fp = create_fencepointer(new_run->buff->keys, *new_run->buff->size);
+	}
+
+	int len = opt_table_size(*new_run->buff->size, level_num + 1, *tree->num_pairs);
+	new_run->bf = create_bloomfilter(new_run->buff->keys, len);
 
 	return new_run;
 }
@@ -554,6 +558,14 @@ void probe_run(lsmtree *tree, run *r, KEY_TYPE key, VAL_TYPE **res, bool **del) 
 	// NULL => before start of run
 	// i => after fence i
 
+	// first, probe bloom filter
+	bool found = query_bloomfilter(r->bf, key);
+	if (!found) {
+		printf("not found\n");
+		return;
+	}
+
+	// now check fence pointers
 	int *fence_num = query_fencepointer(r->fp, key);
 
 	if (fence_num) {
@@ -771,7 +783,10 @@ void free_run(run *r) {
 	free_run_data(r);
 
 	free_fencepointer(r->fp);
-	free_bloomfilter(r->bf);
+
+	if (*r->buff->size > RUN_MIN) {
+		free_bloomfilter(r->bf);
+	}
 
 	free(r->num);
 }

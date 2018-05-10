@@ -1,7 +1,6 @@
 #include "fencepointer.h"
 
 fencepointer *create_fencepointer(KEY_TYPE *keys, int size) {
-	printf("creating fencepointer\n");
 	fencepointer *fp = malloc(sizeof(fencepointer));
 
 	// calculate number of fencepointers and keys per fencepointer
@@ -31,8 +30,6 @@ fencepointer *create_fencepointer(KEY_TYPE *keys, int size) {
 			fp->mins[p] = keys[keys_idx];
 		}
 	}
-
-	printf("size: %d, keys_per_page: %d, num_pages: %d, n_fences: %d, keys_per_fence: %d\n", size, keys_per_page, num_pages, fp->num_fences, fp->keys_per_fence);
 
 	return fp;
 }

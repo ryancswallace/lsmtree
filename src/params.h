@@ -6,13 +6,16 @@
 // LSM tree parameters
 typedef int32_t KEY_TYPE; 
 typedef int32_t VAL_TYPE;
+#define MIN_KEY -2147483648
 #define MAX_KEY 2147483648
 
 #define BUFF_CAPACITY 2
 #define RATIO 3
 
 #define M_FENCES 1 // pages per fence pointer
-#define M_BLOOM 1 
+#define M_BLOOM 3 // hash functions per bloom filter
+#define P_1 0.05 // target false positive rate for level 1
+#define RUN_MIN 1 // minimum run length for bloom filter
 
 #define MAX_NUM_LEVELS 64
 
