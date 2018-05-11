@@ -121,9 +121,14 @@ int exec_query(lsmtree *tree, char* q) {
 		KEY_TYPE key_stop = atoi(strtok(NULL, " "));
 
 		// query
-		KEY_TYPE *pairs = range(tree, key_start, key_stop);
+		buffer *buff = range(tree, key_start, key_stop);
 
-		// TODO: print pairs
+		// print pairs
+		for (int i = 0; i < *buff->size; i++) {
+			if (!buff->dels[i]) {
+				printf("%d:%d", buff->keys[i], buff->vals[i]);
+			}
+		}
 	}	
 	else if(query_type == 'd') {
 		// parse

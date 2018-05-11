@@ -3,6 +3,14 @@
 fencepointer *create_fencepointer(KEY_TYPE *keys, int size) {
 	fencepointer *fp = malloc(sizeof(fencepointer));
 
+	if (size > RUN_MIN) {
+		// store no data
+		fp->num_fences = 0;
+		fp->keys_per_fence = 0;
+
+		return fp;
+	}
+
 	// calculate number of fencepointers and keys per fencepointer
 	int keys_per_page = PAGE_NUM_BYTES / sizeof(KEY_TYPE);
 	fp->keys_per_fence = keys_per_page * M_FENCES;
@@ -37,6 +45,10 @@ fencepointer *create_fencepointer(KEY_TYPE *keys, int size) {
 int *query_fencepointer(fencepointer *fp, KEY_TYPE key) {
 	// NULL => before start of run
 	// i => at fence i or after
+	if (fp->num_fences == 0) {
+		printf("No fence pointers exist.\n");
+		exit(EXIT_FAILURE);
+	}
 	int *fence_num = NULL;
 
 	// printf("query_fencepointer:\n");
@@ -68,6 +80,5 @@ void free_fencepointer(fencepointer *fp) {
 	if (fp->num_fences > 0) {
 		free(fp->mins); 
 	}
-
 	free(fp);
 }

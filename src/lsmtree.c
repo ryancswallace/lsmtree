@@ -210,44 +210,85 @@ void read_vals_dels(lsmtree *tree, run *r, buffer *buff, int idx_start, int idx_
 
 void read_run(lsmtree *tree, run *r, buffer *buff) {
 	// reads all keys, vals, and del flags of the run into provided buffer
+	printf("*r->buff->size: %d\n", *r->buff->size);
+	
+	printf("size: %lu\n", sizeof(buff->vals));
+	printf("size: %lu\n", sizeof(buff->keys));
+	printf("size: %lu\n", sizeof(buff->dels));
+
+	printf("size: %lu\n", sizeof(buff->vals) / sizeof(buff->vals)[0]);
+	printf("size: %lu\n", sizeof(buff->keys) / sizeof(buff->keys)[0]);
+	printf("size: %lu\n", sizeof(buff->dels) / sizeof(buff->dels)[0]);
+	
+	printf("read run\n");
 	char *keys_filepath = run_filepath(tree, r, true, false);
 	char *vals_filepath = run_filepath(tree, r, false, false);
 	char *dels_filepath = run_filepath(tree, r, false, true);
+	printf("read run\n");
 
 	// read from disk
+	printf("read run\n");
+
 	FILE *f_keys = fopen(keys_filepath, "rb");
+	printf("read run\n");
+
 	if (f_keys) {
+		printf("read run\n");
+
 		fread(buff->keys, sizeof(KEY_TYPE), *r->buff->size, f_keys);
+		printf("read run\n");
+		
 		fclose (f_keys);
+		printf("read run\n");
+
 	}
 	else {
 		printf("Unable to read from disk.\n");
 		exit(EXIT_FAILURE);
 	}
+	printf("read run\n");
 
 	FILE *f_vals = fopen(vals_filepath, "rb");
+	printf("read run\n");
+
 	if (f_vals) {
+		printf("read run\n");
+
 		fread(buff->vals, sizeof(VAL_TYPE), *r->buff->size, f_vals);
+		printf("read run\n");
+		
 		fclose (f_vals);
 	}
 	else {
 		printf("Unable to read from disk.\n");
 		exit(EXIT_FAILURE);
 	}
+	printf("read run\n");
 
 	FILE *f_dels = fopen(dels_filepath, "rb");
-	if (f_dels) {
+	printf("read run\n");
+
+	if (f_dels) {	
+		printf("read run before\n");
+
 		fread(buff->dels, sizeof(bool), *r->buff->size, f_dels);
+		printf("read run after\n");
+
 		fclose (f_dels);
+		printf("read run\n");
+
 	}
 	else {
 		printf("Unable to read from disk.\n");
 		exit(EXIT_FAILURE);
 	}
+	printf("read run\n");
 
 	free(keys_filepath);
 	free(vals_filepath);
 	free(dels_filepath);
+	printf("read run\n");
+
 }
 
 void erase_run(lsmtree *tree, run *r) {
@@ -289,7 +330,7 @@ level *read_level(lsmtree *tree, int level_num) {
 		l->runs[run_num]->buff = malloc(sizeof(buffer));
 
 		l->runs[run_num]->buff->size = malloc(sizeof(int));
-		*l->runs[run_num]->buff->size = BUFF_CAPACITY * int_pow(RATIO, level_num - 1);
+		*l->runs[run_num]->buff->size = *tree->levels[level_num - 1]->runs[run_num]->buff->size;
 
 		l->runs[run_num]->buff->keys = calloc(*l->runs[run_num]->buff->size, sizeof(KEY_TYPE));
 		l->runs[run_num]->buff->vals = calloc(*l->runs[run_num]->buff->size, sizeof(VAL_TYPE));
@@ -301,42 +342,63 @@ level *read_level(lsmtree *tree, int level_num) {
 	return l;
 }
 
-void sort(buffer *buff) {
-	// sorts buffer in place, updating buff->size
-	// TODO: stably accounts for updates and deletes
-	int num_duplicates = 0;
+void sort(lsmtree *tree, buffer *buff) {
+	// sorts buffer in place
+	// stably accounts for updates and deletes, updating buff->size
+	if (*buff->size == 0) {
+		return;
+	}
 
-	int min_idx;
-	KEY_TYPE prev_key;
-
+	// // insertion sort--replace with merge sort
 	KEY_TYPE temp_key;
 	VAL_TYPE temp_val;
 	bool temp_del;
 
-	// selection sort--replace with merge sort
-	for (int i = 0; i < *buff->size - 1; i++) {
-		min_idx = i;
-	    for (int j = i + 1; j < *buff->size; j++) {
-	        if (buff->keys[j] < buff->keys[min_idx]) {
-	            min_idx = j;
-	        }
-	    }
-	    if (min_idx != i) {
-	    	temp_key = buff->keys[i];
-			temp_val = buff->vals[i];
-			temp_del = buff->dels[i];
+	int j;
+	for (int i = 1; i < *buff->size; i++) {
+		j = i;
+		while (j > 0 && buff->keys[j - 1] > buff->keys[j]) {
+			temp_key = buff->keys[j];
+			temp_val = buff->vals[j];
+			temp_del = buff->dels[j];
 
-			buff->keys[i] = buff->keys[min_idx];
-			buff->vals[i] = buff->vals[min_idx];
-			buff->dels[i] = buff->dels[min_idx];
+			buff->keys[j] = buff->keys[j-1];
+			buff->vals[j] = buff->vals[j-1];
+			buff->dels[j] = buff->dels[j-1];
 
-			buff->keys[min_idx] = temp_key;
-			buff->vals[min_idx] = temp_val;
-			buff->dels[min_idx] = temp_del;
-	    }
+			buff->keys[j-1] = temp_key;
+			buff->vals[j-1] = temp_val;
+			buff->dels[j-1] = temp_del;
+		}
 	}
 
-	*buff->size -= num_duplicates;
+	// account for updates and deletes
+	int repeats = 0;
+	int num_insert_repeats = 0;
+	int insert_idx = 0;
+	KEY_TYPE curr;
+
+
+	for (int i = 0; i < *buff->size - 1; i++) {
+		curr = buff->keys[i];
+		while (buff->keys[i + 1] == curr) {
+			i++;
+			repeats++;
+			if (!buff->dels[i + 1]) {
+				num_insert_repeats++;
+			}
+		}
+		buff->keys[insert_idx] = buff->keys[i];
+		buff->vals[insert_idx] = buff->vals[i];
+		buff->dels[insert_idx] = buff->dels[i];
+		
+		insert_idx++;
+	}
+
+	(*buff->size) -= repeats;
+
+	(*tree->num_pairs) -= num_insert_repeats;
+	printf("new sorted with size %d\n", (*buff->size));
 }
 
 void merge(lsmtree *tree, int level_num, run *new_run) {
@@ -350,9 +412,11 @@ void merge(lsmtree *tree, int level_num, run *new_run) {
 	int num_runs = *l->num_runs;
 	int sum_sizes = 0;
 	for (int run_num = 0; run_num < *l->num_runs; run_num++) {
-		sum_sizes += *l->runs[run_num]->buff->size;
+		printf("adding size %d\n", *l->runs[run_num]->buff->size);
+		sum_sizes += (*l->runs[run_num]->buff->size);
 	}
 	*new_run->buff->size = sum_sizes;
+	printf("*new_run->buff->size: %d\n", *new_run->buff->size);
 
 	// create new buffer for merged runs
 	new_run->buff->keys = calloc(sum_sizes, sizeof(KEY_TYPE));
@@ -377,27 +441,54 @@ void merge(lsmtree *tree, int level_num, run *new_run) {
 	long min_key = MAX_KEY;
 	int min_run_num;
 	int min_run_idx;
+	
+	int insert_idx = 0;
+	int repeats = 0;
+	int num_insert_repeats = 0;
+	KEY_TYPE last_key;
 
 	for (int i = 0; i < sum_sizes; i++) {
-		// printf("i: %d\n", i);
+		printf("i: %d\n", i);
 		for (int run = num_runs - 1; run >= 0; run--) {
-			// printf("run: %d\n", run);
+			printf("run with: %d\n", run);
 			if (head_idxs[run] < *l->runs[run]->buff->size) {
-				// printf("not empty at head_idxs[run] %d\n", head_idxs[run]);
+				printf("not empty at head_idxs[run] %d\n", head_idxs[run]);
 				// run not emptied
 				if (l->runs[run]->buff->keys[head_idxs[run]] <= min_key) {
-					// printf("less at head_idxs[run] %d\n", head_idxs[run]);
+					printf("less at head_idxs[run] %d\n", head_idxs[run]);
 					min_key = l->runs[run]->buff->keys[head_idxs[run]];
 					min_run_num = run;
 					min_run_idx = head_idxs[run];
-					// printf("new min_key %ld\n", min_key);
+					printf("new min_key %ld\n", min_key);
 				}
 			}
 		}
-		new_run->buff->keys[i] = l->runs[min_run_num]->buff->keys[min_run_idx];
-		new_run->buff->vals[i] = l->runs[min_run_num]->buff->vals[min_run_idx];
-		new_run->buff->dels[i] = l->runs[min_run_num]->buff->dels[min_run_idx];
 
+		if (i == 0) {
+			new_run->buff->keys[insert_idx] = l->runs[min_run_num]->buff->keys[min_run_idx];
+			new_run->buff->vals[insert_idx] = l->runs[min_run_num]->buff->vals[min_run_idx];
+			new_run->buff->dels[insert_idx] = l->runs[min_run_num]->buff->dels[min_run_idx];
+		}
+		else {
+			if (l->runs[min_run_num]->buff->keys[min_run_idx] != last_key) {
+				// don't overwrite
+				insert_idx++;
+			}
+			else {
+				// overwrite
+				repeats++;
+				if (!l->runs[min_run_num]->buff->dels[min_run_idx]) {
+					num_insert_repeats++;
+				}
+			}
+
+			new_run->buff->keys[insert_idx] = l->runs[min_run_num]->buff->keys[min_run_idx];
+			new_run->buff->vals[insert_idx] = l->runs[min_run_num]->buff->vals[min_run_idx];
+			new_run->buff->dels[insert_idx] = l->runs[min_run_num]->buff->dels[min_run_idx];
+		}
+
+		last_key = new_run->buff->keys[insert_idx];
+	
 		// printf("min was %ld=%d at run %d, idx %d\n", min_key, l->runs[min_run_num]->buff->keys[min_run_idx], min_run_num, min_run_idx);
 
 		head_idxs[min_run_num]++;
@@ -410,6 +501,9 @@ void merge(lsmtree *tree, int level_num, run *new_run) {
 	// 	printf("%d ", new_run->buff->keys[i]);
 	// }	
 	// printf("\n\n");
+
+	(*new_run->buff->size) -= repeats;
+	(*tree->num_pairs) -= num_insert_repeats;
 
 	free_level(l);
 }
@@ -434,7 +528,9 @@ run *merge_level(lsmtree *tree, int level_num) {
 
 		*new_run->buff->size = *tree->buff->size;
 
-		sort(new_run->buff);
+		sort(tree, new_run->buff);
+
+		printf("size after sort: %d\n", *new_run->buff->size);
 	}
 	else {
 		// merge, populating new run
@@ -442,9 +538,7 @@ run *merge_level(lsmtree *tree, int level_num) {
 	}
 	
 	// construct bloom filter and fence pointers
-	if (*new_run->buff->size > RUN_MIN) {
-		new_run->fp = create_fencepointer(new_run->buff->keys, *new_run->buff->size);
-	}
+	new_run->fp = create_fencepointer(new_run->buff->keys, *new_run->buff->size);
 
 	int len = opt_table_size(*new_run->buff->size, level_num + 1, *tree->num_pairs);
 	new_run->bf = create_bloomfilter(new_run->buff->keys, len);
@@ -521,6 +615,145 @@ void merge_lsmtree(lsmtree *tree, int level_num) {
 	merge_lsmtree(tree, level_num + 1);
 }
 
+void probe_run(lsmtree *tree, run *r, KEY_TYPE key, VAL_TYPE **res, bool **del) {
+	// probes run r for specified key. If found, allocates memory and 
+	// populates pointers to res and del
+
+	// NULL => before start of run
+	// i => after fence i
+	printf("probe_run\n");
+
+	if (*r->buff->size == 0) {
+		return;
+	}
+
+	// first, probe bloom filter
+	printf("before query_bloomfilter\n");
+
+	bool found = query_bloomfilter(r->bf, key);
+	if (!found) {
+		printf("not found\n");
+		return;
+	}
+	printf("finished query_bloomfilter\n");
+
+	
+	// if there are no fence pointers, simply query run
+	if (r->fp->num_fences == 0) {
+		printf("no fps\n");
+		buffer *buff = malloc(sizeof(buff));
+		buff->size = malloc(sizeof(int));
+		*buff->size = *r->buff->size;
+		buff->keys = calloc(*r->buff->size, sizeof(KEY_TYPE));
+		buff->vals = calloc(*r->buff->size, sizeof(VAL_TYPE));
+		buff->dels = calloc(*r->buff->size, sizeof(bool));
+		printf("calloc(%d, %d)\n", *r->buff->size, sizeof(KEY_TYPE));
+		printf("calloc(%d, %d)\n", *r->buff->size, sizeof(VAL_TYPE));
+		printf("calloc(%d, %d)\n", *r->buff->size, sizeof(bool));
+		printf("size: %d\n", sizeof(buff->vals));
+		printf("size: %d\n", sizeof(buff->keys));
+		printf("size: %d\n", sizeof(buff->dels));
+
+		printf("read_run with *r->buff->size: %d", *r->buff->size);
+
+		read_run(tree, r, buff);
+		printf("no fps\n");
+
+		for (int i = *r->buff->size - 1; i >= 0; i--) {
+			if (buff->keys[i] == key) {
+				*res = malloc(sizeof(VAL_TYPE));
+				*del = malloc(sizeof(bool));
+
+				**res = buff->vals[i];
+				**del = buff->dels[i];
+
+				free(buff->vals);
+				free(buff->dels);
+
+				break;
+			}
+		}
+		printf("no fps\n");
+
+		free(buff->size);
+		free(buff->keys);
+		free(buff);
+	}
+
+	// if there are fence pointers, use them
+	else {
+		printf("fps\n");
+
+		int *fence_num = query_fencepointer(r->fp, key);
+
+		if (fence_num) {
+			printf("fence_num\n");
+
+			// find range of key indices
+			int idx_start = (*fence_num - 1) * r->fp->keys_per_fence;
+			int idx_stop = ((*fence_num) * r->fp->keys_per_fence) - 1;
+			if (idx_stop > *r->buff->size - 1) {
+				idx_stop = *r->buff->size - 1;
+			}
+			int num_keys = idx_stop - idx_start + 1;
+			printf("fence_num\n");
+
+			buffer *buff = malloc(sizeof(buff));
+			buff->size = malloc(sizeof(int));
+			buff->keys = calloc(num_keys, sizeof(KEY_TYPE));
+			printf("fence_num\n");
+
+			// // read portion of run from disk
+			read_keys(tree, r, buff, idx_start, idx_stop);
+
+			// check for key in portion
+			for (int i = num_keys - 1; i >= 0; i--) {
+				if (buff->keys[i] == key) {
+					buff->vals = calloc(num_keys, sizeof(VAL_TYPE));
+					buff->dels = calloc(num_keys, sizeof(bool));
+
+					read_vals_dels(tree, r, buff, idx_start, idx_stop);
+
+					*res = malloc(sizeof(VAL_TYPE));
+					*del = malloc(sizeof(bool));
+
+					**res = buff->vals[i];
+					**del = buff->dels[i];
+
+					free(buff->vals);
+					free(buff->dels);
+
+					break;
+				}
+			}
+			printf("fence_num\n");
+
+			free(buff->size);
+			free(buff->keys);
+			free(buff);
+			printf("fence_num\n");
+
+		}
+		else {
+			// key not in run
+			return;
+		}
+	}
+}
+
+// VAL_TYPE **clean_run(run *r) {
+// 	// removes any duplicate keys from sorted run by setting deletes
+
+// 	// populate vals buff
+// 	KEY_TYPE k;
+// 	for (int i = 0; i < *r->buff->size; i++) {
+// 		if (r->buff->keys[i] == r->buff->keys[i+1]) {
+// 			// overwritten
+// 			r->buff->
+// 		}
+// 	}
+// }
+
 /*
 SECTION 2: functions for querying LSM tree.
 */
@@ -551,75 +784,11 @@ void put(lsmtree *tree, KEY_TYPE key, VAL_TYPE val, bool del) {
 	}
 }
 
-void probe_run(lsmtree *tree, run *r, KEY_TYPE key, VAL_TYPE **res, bool **del) {
-	// probes run r for specified key. If found, allocates memory and 
-	// populates pointers to res and del
-
-	// NULL => before start of run
-	// i => after fence i
-
-	// first, probe bloom filter
-	bool found = query_bloomfilter(r->bf, key);
-	if (!found) {
-		printf("not found\n");
-		return;
-	}
-
-	// now check fence pointers
-	int *fence_num = query_fencepointer(r->fp, key);
-
-	if (fence_num) {
-		// find range of key indices
-		int idx_start = (*fence_num - 1) * r->fp->keys_per_fence;
-		int idx_stop = ((*fence_num) * r->fp->keys_per_fence) - 1;
-		if (idx_stop > *r->buff->size - 1) {
-			idx_stop = *r->buff->size - 1;
-		}
-		int num_keys = idx_stop - idx_start + 1;
-
-		buffer *buff = malloc(sizeof(buff));
-		buff->size = malloc(sizeof(int));
-		buff->keys = calloc(num_keys, sizeof(KEY_TYPE));
-
-		// // read portion of run from disk
-		read_keys(tree, r, buff, idx_start, idx_stop);
-
-		// check for key in portion
-		for (int i = num_keys - 1; i >= 0; i--) {
-			if (buff->keys[i] == key) {
-				buff->vals = calloc(num_keys, sizeof(VAL_TYPE));
-				buff->dels = calloc(num_keys, sizeof(bool));
-
-				read_vals_dels(tree, r, buff, idx_start, idx_stop);
-
-				*res = malloc(sizeof(VAL_TYPE));
-				*del = malloc(sizeof(bool));
-
-				**res = buff->vals[i];
-				**del = buff->dels[i];
-
-				free(buff->vals);
-				free(buff->dels);
-
-				break;
-			}
-		}
-
-		free(buff->size);
-		free(buff->keys);
-		free(buff);
-	}
-	else {
-		// key not in run
-		return;
-	}
-}
-
 VAL_TYPE *get(lsmtree *tree, KEY_TYPE key) {
 	// returns pointer to val if found, otherwise NULL
 	// caller must free return value if not NULL
+	printf("getting\n");
 	VAL_TYPE *res = NULL;
-	bool *del = NULL;
 
 	// scan L0 backwards
 	for (int i = *tree->buff->size - 1; i >= 0; i--) {
@@ -632,30 +801,49 @@ VAL_TYPE *get(lsmtree *tree, KEY_TYPE key) {
 			return res; // still NULL if deleted
 		}
 	}
+	printf("after scan\n");
 
 	// probe disk
 	for (int level_num = 1; level_num < *tree->num_levels; level_num++) {
+		printf("level_num: %d\n", level_num);
+
 		level *l = tree->levels[level_num - 1];
 		for (int run_num = *l->num_runs - 1; run_num >= 0; run_num--) {
+			printf("run_num: %d\n", run_num);
+
+			VAL_TYPE *res = NULL;
+			bool *del = NULL;
+
 			run *r = l->runs[run_num];
+			printf("before probe\n");
 			probe_run(tree, r, key, &res, &del);
+			printf("after probe\n");
+			
 			if (res) {
+				printf("in res\n");
+
 				// key found
 				if (*del) {
 					// deleted
 					res = NULL;
+					printf("res = NULL\n");
+
 				}
+				printf("freeing del\n");
 				free(del);
+				printf("freed del\n");
+
 				return res;
 			}
 		}
 	}
 
 	// not found in tree
+	printf("not found");
 	return res; 
 }
 
-KEY_TYPE *range(lsmtree *tree, KEY_TYPE key_start, KEY_TYPE key_stop) {
+buffer *range(lsmtree *tree, KEY_TYPE key_start, KEY_TYPE key_stop) {
 	return 0;
 }
 
@@ -781,7 +969,6 @@ void free_buffer(buffer *buff) {
 
 void free_run(run *r) {
 	free_run_data(r);
-
 	free_fencepointer(r->fp);
 
 	if (*r->buff->size > RUN_MIN) {

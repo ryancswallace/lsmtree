@@ -7,7 +7,7 @@
 typedef int32_t KEY_TYPE; 
 typedef int32_t VAL_TYPE;
 #define MIN_KEY -2147483648
-#define MAX_KEY 2147483648
+#define MAX_KEY 2147483647
 
 #define BUFF_CAPACITY 2
 #define RATIO 3
