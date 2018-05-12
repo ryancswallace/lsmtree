@@ -19,7 +19,7 @@ typedef struct buffer {
 
 	KEY_TYPE *keys;
 	VAL_TYPE *vals;
-	bool *dels;
+	DEL_TYPE *dels;
 } buffer;
 
 typedef struct run {
@@ -70,8 +70,8 @@ void merge(lsmtree *tree, int level_num, run *new_run);
 run *merge_level(lsmtree *tree, int level_num); 
 void merge_lsmtree(lsmtree *tree, int level_num);
 
-void put(lsmtree *tree, KEY_TYPE key, VAL_TYPE val, bool del);
-void probe_run(lsmtree *tree, run *r, KEY_TYPE key, VAL_TYPE **res, bool **del);
+void put(lsmtree *tree, KEY_TYPE key, VAL_TYPE val, DEL_TYPE del);
+void probe_run(lsmtree *tree, run *r, KEY_TYPE key, VAL_TYPE **res, DEL_TYPE **del);
 VAL_TYPE *get(lsmtree *tree, KEY_TYPE key);
 buffer *range(lsmtree *tree, KEY_TYPE key_start, KEY_TYPE key_stop);
 void delete(lsmtree *tree, KEY_TYPE key);

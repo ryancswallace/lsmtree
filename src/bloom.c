@@ -6,7 +6,7 @@ bloomfilter *create_bloomfilter(KEY_TYPE *keys, int len) {
 	bloomfilter *bf = malloc(sizeof(bf));
 
 	// construct bloom filter
-	bf->num_hts = M_BLOOM;
+	bf->num_hts = NUM_HASHES;
 	bf->hts = calloc(bf->num_hts, sizeof(hashtable *));
 	for (int ht_num = 0; ht_num < bf->num_hts; ht_num++) {
 		bf->hts[ht_num] = malloc(sizeof(hashtable));
@@ -49,7 +49,7 @@ unsigned int hash(KEY_TYPE key, int type, int len) {
 	    x = x ^ (x >> 31);
 	}
 	else {
-		printf("Increase M_BLOOM\n.");
+		printf("Increase NUM_HASHES\n.");
 		exit(EXIT_FAILURE);
 	}
 	// printf("x: %llu\n", x);
@@ -107,7 +107,7 @@ bool query_bloomfilter(bloomfilter *bf, KEY_TYPE key) {
 	return false;
 }
 
-int opt_table_size(int run_len, int level_num, int N) {
+int opt_table_size_ideal(int level_num, int N) {
 	// Monkey inspired	
 	float T = RATIO;
 	float T_L = (float) int_pow(RATIO, level_num - 1);
@@ -124,6 +124,20 @@ int opt_table_size(int run_len, int level_num, int N) {
 	}
 
 	return opt_size;
+}
+
+int opt_table_size_constrained(void) {
+	// calculates approximate maximum size of each hash table of the bloom
+	// filter that can fit within the memory constraints after the buffer
+	// is allocated
+	int bytes_buff = (sizeof(KEY_TYPE) + sizeof(VAL_TYPE) + sizeof(DEL_TYPE)) * BUFF_CAPACITY;
+	int bytes_bf = BUFF_PLUS_BF_CAPACITY - bytes_buff;
+	int bytes_per_hash = bytes_bf / NUM_HASHES;
+
+	int max_runs = RATIO * EST_NUM_LAYERS;
+	int bytes_per_hash_per_run = bytes_per_hash / max_runs;
+
+	return bytes_per_hash_per_run;
 }
 
 void free_bloomfilter(bloomfilter *bf) {

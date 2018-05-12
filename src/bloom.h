@@ -9,6 +9,8 @@
 #include "params.h"
 #include "util.h"
 
+#define EST_NUM_LAYERS 8
+
 typedef struct hashtable {
 	int type;
 	int len;
@@ -32,7 +34,8 @@ void set_bloomfilter(bloomfilter *bf, KEY_TYPE key);
 bool query_hashtable(hashtable *ht, KEY_TYPE key);
 bool query_bloomfilter(bloomfilter *bf, KEY_TYPE key);
 
-int opt_table_size(int run_len, int level_num, int N);
+int opt_table_size_ideal(int level_num, int N);
+int opt_table_size_constrained(void);
 
 void free_bloomfilter(bloomfilter *bf);
 

@@ -37,7 +37,7 @@ int empty_lsmtree(lsmtree *tree, char *name) {
 
 	tree->buff->keys = calloc(BUFF_CAPACITY, sizeof(KEY_TYPE));
 	tree->buff->vals = calloc(BUFF_CAPACITY, sizeof(VAL_TYPE));
-	tree->buff->dels = calloc(BUFF_CAPACITY, sizeof(bool));
+	tree->buff->dels = calloc(BUFF_CAPACITY, sizeof(DEL_TYPE));
 
 	// initialize levels and first level
 	tree->levels = calloc(MAX_NUM_LEVELS, sizeof(level *));
@@ -133,7 +133,7 @@ void write_run(lsmtree *tree, run *new_run) {
 	// TODO: pack bits
 	FILE *f_dels = fopen(dels_filepath, "wb");
 	if (f_dels) {
-		fwrite(new_run->buff->dels, sizeof(bool), *new_run->buff->size, f_dels);
+		fwrite(new_run->buff->dels, sizeof(DEL_TYPE), *new_run->buff->size, f_dels);
 		fclose (f_dels);
 	}
 	else {
@@ -178,7 +178,7 @@ void read_vals_dels(lsmtree *tree, run *r, buffer *buff, int idx_start, int idx_
 
 	// calculate where to read
 	int offset_vals = idx_start * sizeof(VAL_TYPE);
-	int offset_dels = idx_start * sizeof(bool);
+	int offset_dels = idx_start * sizeof(DEL_TYPE);
 	int num_keys = idx_stop - idx_start + 1;
 
 	// read from disk
@@ -196,7 +196,7 @@ void read_vals_dels(lsmtree *tree, run *r, buffer *buff, int idx_start, int idx_
 	FILE *f_dels = fopen(dels_filepath, "rb");
 	if (f_dels) {
 		fseek(f_dels, offset_dels, SEEK_SET);
-		fread(buff->dels, sizeof(bool), num_keys, f_dels);
+		fread(buff->dels, sizeof(DEL_TYPE), num_keys, f_dels);
 		fclose(f_dels);
 	}
 	else {
@@ -271,7 +271,7 @@ void read_run(lsmtree *tree, run *r, buffer *buff) {
 	if (f_dels) {	
 		printf("read run before\n");
 
-		fread(buff->dels, sizeof(bool), *r->buff->size, f_dels);
+		fread(buff->dels, sizeof(DEL_TYPE), *r->buff->size, f_dels);
 		printf("read run after\n");
 
 		fclose (f_dels);
@@ -334,7 +334,7 @@ level *read_level(lsmtree *tree, int level_num) {
 
 		l->runs[run_num]->buff->keys = calloc(*l->runs[run_num]->buff->size, sizeof(KEY_TYPE));
 		l->runs[run_num]->buff->vals = calloc(*l->runs[run_num]->buff->size, sizeof(VAL_TYPE));
-		l->runs[run_num]->buff->dels = calloc(*l->runs[run_num]->buff->size, sizeof(bool));
+		l->runs[run_num]->buff->dels = calloc(*l->runs[run_num]->buff->size, sizeof(DEL_TYPE));
 
 		read_run(tree, tree->levels[level_num - 1]->runs[run_num], l->runs[run_num]->buff);
 	}
@@ -352,7 +352,7 @@ void sort(lsmtree *tree, buffer *buff) {
 	// // insertion sort--replace with merge sort
 	KEY_TYPE temp_key;
 	VAL_TYPE temp_val;
-	bool temp_del;
+	DEL_TYPE temp_del;
 
 	int j;
 	for (int i = 1; i < *buff->size; i++) {
@@ -421,7 +421,7 @@ void merge(lsmtree *tree, int level_num, run *new_run) {
 	// create new buffer for merged runs
 	new_run->buff->keys = calloc(sum_sizes, sizeof(KEY_TYPE));
 	new_run->buff->vals = calloc(sum_sizes, sizeof(VAL_TYPE));
-	new_run->buff->dels = calloc(sum_sizes, sizeof(bool));
+	new_run->buff->dels = calloc(sum_sizes, sizeof(DEL_TYPE));
 
 	// perform merge, counting duplicate keys; inefficient--should be nlog(n)
 	int head_idxs[num_runs];
@@ -540,7 +540,7 @@ run *merge_level(lsmtree *tree, int level_num) {
 	// construct bloom filter and fence pointers
 	new_run->fp = create_fencepointer(new_run->buff->keys, *new_run->buff->size);
 
-	int len = opt_table_size(*new_run->buff->size, level_num + 1, *tree->num_pairs);
+	int len = opt_table_size_constrained();
 	new_run->bf = create_bloomfilter(new_run->buff->keys, len);
 
 	return new_run;
@@ -615,7 +615,7 @@ void merge_lsmtree(lsmtree *tree, int level_num) {
 	merge_lsmtree(tree, level_num + 1);
 }
 
-void probe_run(lsmtree *tree, run *r, KEY_TYPE key, VAL_TYPE **res, bool **del) {
+void probe_run(lsmtree *tree, run *r, KEY_TYPE key, VAL_TYPE **res, DEL_TYPE **del) {
 	// probes run r for specified key. If found, allocates memory and 
 	// populates pointers to res and del
 
@@ -630,7 +630,7 @@ void probe_run(lsmtree *tree, run *r, KEY_TYPE key, VAL_TYPE **res, bool **del) 
 	// first, probe bloom filter
 	printf("before query_bloomfilter\n");
 
-	bool found = query_bloomfilter(r->bf, key);
+	DEL_TYPE found = query_bloomfilter(r->bf, key);
 	if (!found) {
 		printf("not found\n");
 		return;
@@ -646,10 +646,10 @@ void probe_run(lsmtree *tree, run *r, KEY_TYPE key, VAL_TYPE **res, bool **del) 
 		*buff->size = *r->buff->size;
 		buff->keys = calloc(*r->buff->size, sizeof(KEY_TYPE));
 		buff->vals = calloc(*r->buff->size, sizeof(VAL_TYPE));
-		buff->dels = calloc(*r->buff->size, sizeof(bool));
+		buff->dels = calloc(*r->buff->size, sizeof(DEL_TYPE));
 		printf("calloc(%d, %d)\n", *r->buff->size, sizeof(KEY_TYPE));
 		printf("calloc(%d, %d)\n", *r->buff->size, sizeof(VAL_TYPE));
-		printf("calloc(%d, %d)\n", *r->buff->size, sizeof(bool));
+		printf("calloc(%d, %d)\n", *r->buff->size, sizeof(DEL_TYPE));
 		printf("size: %d\n", sizeof(buff->vals));
 		printf("size: %d\n", sizeof(buff->keys));
 		printf("size: %d\n", sizeof(buff->dels));
@@ -662,7 +662,7 @@ void probe_run(lsmtree *tree, run *r, KEY_TYPE key, VAL_TYPE **res, bool **del) 
 		for (int i = *r->buff->size - 1; i >= 0; i--) {
 			if (buff->keys[i] == key) {
 				*res = malloc(sizeof(VAL_TYPE));
-				*del = malloc(sizeof(bool));
+				*del = malloc(sizeof(DEL_TYPE));
 
 				**res = buff->vals[i];
 				**del = buff->dels[i];
@@ -710,12 +710,12 @@ void probe_run(lsmtree *tree, run *r, KEY_TYPE key, VAL_TYPE **res, bool **del) 
 			for (int i = num_keys - 1; i >= 0; i--) {
 				if (buff->keys[i] == key) {
 					buff->vals = calloc(num_keys, sizeof(VAL_TYPE));
-					buff->dels = calloc(num_keys, sizeof(bool));
+					buff->dels = calloc(num_keys, sizeof(DEL_TYPE));
 
 					read_vals_dels(tree, r, buff, idx_start, idx_stop);
 
 					*res = malloc(sizeof(VAL_TYPE));
-					*del = malloc(sizeof(bool));
+					*del = malloc(sizeof(DEL_TYPE));
 
 					**res = buff->vals[i];
 					**del = buff->dels[i];
@@ -758,7 +758,7 @@ void probe_run(lsmtree *tree, run *r, KEY_TYPE key, VAL_TYPE **res, bool **del) 
 SECTION 2: functions for querying LSM tree.
 */
 
-void put(lsmtree *tree, KEY_TYPE key, VAL_TYPE val, bool del) {
+void put(lsmtree *tree, KEY_TYPE key, VAL_TYPE val, DEL_TYPE del) {
 	if (tree->pairs_per_level[0] < BUFF_CAPACITY) {
 		tree->buff->keys[tree->pairs_per_level[0]] = key;
 		tree->buff->vals[tree->pairs_per_level[0]] = val;
@@ -812,7 +812,7 @@ VAL_TYPE *get(lsmtree *tree, KEY_TYPE key) {
 			printf("run_num: %d\n", run_num);
 
 			VAL_TYPE *res = NULL;
-			bool *del = NULL;
+			DEL_TYPE *del = NULL;
 
 			run *r = l->runs[run_num];
 			printf("before probe\n");
@@ -909,7 +909,7 @@ void print_stats(lsmtree *tree) {
 				buffer *buff = malloc(sizeof(buffer));
 				buff->keys = calloc(*tree->levels[level_num-1]->runs[run]->buff->size, sizeof(KEY_TYPE));
 				buff->vals = calloc(*tree->levels[level_num-1]->runs[run]->buff->size, sizeof(VAL_TYPE));
-				buff->dels = calloc(*tree->levels[level_num-1]->runs[run]->buff->size, sizeof(bool));
+				buff->dels = calloc(*tree->levels[level_num-1]->runs[run]->buff->size, sizeof(DEL_TYPE));
 
 				read_run(tree, tree->levels[level_num-1]->runs[run], buff);
 
