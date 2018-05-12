@@ -14,7 +14,6 @@ bloomfilter *create_bloomfilter(KEY_TYPE *keys, int len) {
 		bf->hts[ht_num]->type = ht_num;
 		bf->hts[ht_num]->len = len;
 		bf->hts[ht_num]->table = calloc(len, sizeof(bool));
-		// printf("created ht with len %d\n", bf->hts[ht_num]->len);
 	}
 
 	// populate bloom filter
@@ -27,7 +26,6 @@ bloomfilter *create_bloomfilter(KEY_TYPE *keys, int len) {
 }
 
 unsigned int hash(KEY_TYPE key, int type, int len) {
-	// printf("hashing %d, type %d, len %d\n", key, type, len);
 	// modified from https://stackoverflow.com/questions/664014/
 	// hashes key using specified hash type
 	uint64_t x = key;
@@ -52,22 +50,16 @@ unsigned int hash(KEY_TYPE key, int type, int len) {
 		printf("Increase NUM_HASHES\n.");
 		exit(EXIT_FAILURE);
 	}
-	// printf("x: %llu\n", x);
     unsigned int hashed = x;
-    // printf("hashed0: %d\n", hashed);
 	hashed = hashed % len;
-    // printf("hashed: %d\n", hashed);
 
 	return hashed;
 }
 
 void set_hashtable(hashtable *ht, KEY_TYPE key) {
-	// printf("setting ht %d for %d\n", ht->type, key);
-
 	unsigned int hashed = hash(key, ht->type, ht->len);
 	ht->table[hashed] = true;
 
-	// printf("hashed: %d\n", hashed);
 }
 
 void set_bloomfilter(bloomfilter *bf, KEY_TYPE key) {
@@ -85,9 +77,6 @@ bool query_hashtable(hashtable *ht, KEY_TYPE key) {
 	unsigned int hashed = hash(key, ht->type, ht->len);
 	bool found = ht->table[hashed];
 	
-	// printf("hashed: %d\n", hashed);
-	// printf("found: %d\n", found);
-
 	return found;
 }
 
@@ -137,6 +126,10 @@ int opt_table_size_constrained(void) {
 	int max_runs = RATIO * EST_NUM_LAYERS;
 	int bytes_per_hash_per_run = bytes_per_hash / max_runs;
 
+	if (bytes_per_hash_per_run < 0) {
+		bytes_per_hash_per_run = 0;
+	}
+	
 	return bytes_per_hash_per_run;
 }
 

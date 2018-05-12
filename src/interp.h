@@ -1,6 +1,7 @@
 #ifndef INTERP_H
 #define INTERP_H
 
+#include <time.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>

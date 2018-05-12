@@ -3,7 +3,7 @@
 fencepointer *create_fencepointer(KEY_TYPE *keys, int size) {
 	fencepointer *fp = malloc(sizeof(fencepointer));
 
-	if (size > RUN_MIN) {
+	if (size < RUN_MIN) {
 		// store no data
 		fp->num_fences = 0;
 		fp->keys_per_fence = 0;
@@ -46,16 +46,10 @@ int *query_fencepointer(fencepointer *fp, KEY_TYPE key) {
 	// NULL => before start of run
 	// i => at fence i or after
 	if (fp->num_fences == 0) {
-		printf("No fence pointers exist.\n");
+		// printf("No fence pointers exist.\n");
 		exit(EXIT_FAILURE);
 	}
 	int *fence_num = NULL;
-
-	// printf("query_fencepointer:\n");
-	// for (int i = 0; i < fp->num_fences; i++) {
-	// 	printf("i: %d, ", fp->mins[i]);
-	// }
-	// printf("\n");
 
 	if (key >= fp->mins[0]) {
 		// not before start of run

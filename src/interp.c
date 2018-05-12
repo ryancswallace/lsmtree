@@ -176,6 +176,8 @@ int exec_query(lsmtree *tree, char* q) {
 int exec_workload(lsmtree *tree, char *filepath) {
 	// reads and executes workload file. reads chunks of lines to minimize 
 	// both memory overhead and I/O. workload must end in trailing newline
+	clock_t begin = clock();
+
 	char *workload = NULL;
 	long len;
 
@@ -207,6 +209,10 @@ int exec_workload(lsmtree *tree, char *filepath) {
 
 	// clean up
 	free(workload);
+
+	clock_t end = clock();
+	double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+	printf("time: %f\n", time_spent);
 
 	return 0;
 }

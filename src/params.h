@@ -11,10 +11,10 @@ typedef bool DEL_TYPE;
 #define MIN_KEY -2147483648
 #define MAX_KEY 2147483647
 
-#define RATIO 3
-
 #define BUFF_PLUS_BF_CAPACITY 100000000 // in bytes
-#define BUFF_CAPACITY 2 // in pairs
+
+#define RATIO 2 // 2, 10
+#define BUFF_CAPACITY 2 // in pairs, 400, 10000, 100000
 
 #define NUM_HASHES 3 // hash functions per bloom filter
 #define RUN_MIN 1 // minimum run length for bloom filter
@@ -29,9 +29,7 @@ typedef bool DEL_TYPE;
 // user config parameters
 #define PAGE_NUM_BYTES 4096
 #define MAX_NUM_LEVELS 64
-#define DATA_DIR "/Users/RyanWallace/Desktop/All/School/Harvard/S S2/CS 265/project/data/"
+#define DATA_DIR // specify data directory here
+
 #endif
 
-// "/Users/RyanWallace/Desktop/All/School/Harvard/S S2/CS 265/project/generator/generator/workload.txt"
-// "/Users/RyanWallace/Desktop/All/School/Harvard/S S2/CS 265/project/generator/generator/workload_big.txt"
-// "/Users/RyanWallace/Desktop/All/School/Harvard/S S2/CS 265/project/generator/generator/workload_sm.txt"
